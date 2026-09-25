@@ -4,7 +4,61 @@ Wspólny log sesji na tym repo. Każda nowa sesja/agent dopisuje sekcję na
 dole z datą, co zrobiła i w jakim stanie to zostawiła. Nie nadpisuj
 cudzych wpisów.
 
-## NASTĘPNY KROK (aktualne na 2026-09-25, koniec sesji "szyszki: detekcja + dystans")
+## NASTĘPNY KROK (aktualne na 2026-09-25, koniec sesji "Pi 5: pierwsze uruchomienie całości")
+
+Wszystko (kamera D415, ramię SO-101, Xiao napędu) jest podłączone do Pi 5
+i działa z Pi. Pierwsza realna próba chwytu szyszki: nieudana, ale
+znaleziona przyczyna (zamienione ID serw, patrz niżej) — PO tej poprawce
+chwyt nie był jeszcze ponownie próbowany.
+
+**Najważniejsze na start następnej sesji (w tej kolejności):**
+1. **Potwierdzić zamianę ID serw.** `./arm.sh move shoulder_lift=<obecna+10>`
+   musi ruszyć BARKIEM (2. przegub od podstawy), a `elbow_flex` ŁOKCIEM.
+   Ostatni test po zamianie: shoulder_lift 128→139, elbow bez zmian, ale
+   użytkownik nie zdążył potwierdzić wzrokowo.
+2. Jeśli OK: `./arm.sh home`, potem `approach_and_grasp.py --no-drive`
+   (dry-run) i na żywo z `--port /dev/robot-arm`. IK wcześniej "nie
+   działało", bo komendy barku szły do łokcia — z poprawnym ID ma szansę.
+3. Jeśli IK dalej chybia: `replay_demo.py` (odtworzenie ręcznej
+   demonstracji, bez IK) — działa tylko dla tej samej pozycji szyszki.
+4. Zmierzyć realnie przejazd na krok (`drive_step.py`) miarką i wpisać do
+   `auto_collect.py` (teraz szacunek ~1 m/s przy PWM 150).
+5. Internet na Pi (patrz "Jak się połączyć") — bez niego `git pull` na Pi
+   nie działa, pliki idą przez `scp`.
+
+### Jak się połączyć z Pi (stan na koniec sesji)
+
+- Kabel ethernet laptop↔Pi (adapter USB-Ethernet w laptopie). Pi ma
+  **statyczne IP `192.168.137.5`** (ustawione przez nmcli na
+  "Wired connection 1"), laptop `192.168.137.1` (Windows ICS).
+- `ssh robot@192.168.137.5` — user `robot`, hasło znasz. `robot.local`
+  (mDNS) działa z git-bash, ale NIE z PowerShell — w PowerShell używaj IP.
+- Terminale użytkownika na Windows działają jako konto `slawe`, narzędzia
+  Claude jako `pawel` — dlatego klucz SSH działa u Claude'a, a u ciebie
+  pyta o hasło. Nie ruszać ACL `~/.ssh/id_ed25519` (icacls je psuło).
+- Pliki z laptopa na Pi: `scp plik.py robot@192.168.137.5:~/hackaton/`
+  (w PowerShell na laptopie, NIE w sesji SSH).
+- WiFi Pi: NIE działa (handshake WPA do hotspotu iPhone pada). Profile
+  WiFi usunięte. Pi nie ma internetu.
+
+### Jak odpalać (w sesji SSH na Pi)
+
+```bash
+cd ~/hackaton && source .venv/bin/activate
+./arm.sh status | home | straight | open | close | move shoulder_pan=10
+python rs_mjpeg_server.py          # podgląd na żywo: http://192.168.137.5:8080/ (Ctrl+C = stop)
+python scan_cones.py --json cel.json
+python approach_and_grasp.py --no-drive                       # dry-run planu
+python approach_and_grasp.py --no-drive --port /dev/robot-arm # NA ŻYWO
+python drive_step.py --port /dev/robot-drive --speed 150 --duration 0.05   # jeden krok kołami
+python auto_collect.py --drive-port /dev/robot-drive --arm-port /dev/robot-arm --dry-run
+python record_demo.py --seconds 25 --out demo.csv   # nagranie ręcznego ruchu (torque off)
+python replay_demo.py --port /dev/robot-arm [--dry-run]
+```
+Kamera na wyłączność: zatrzymaj `rs_mjpeg_server.py` przed skanem.
+Porty: `/dev/robot-arm` (ramię), `/dev/robot-drive` (Xiao), udev działa.
+
+## Poprzedni NASTĘPNY KROK (sesja "szyszki: detekcja + dystans", częściowo nieaktualny)
 
 Cel ogólny: pick-and-place dowolnych, nieoznaczonych obiektów z podłogi
 ramieniem SO-101, z kamerą D415 na platformie robota, docelowo wszystko
@@ -455,3 +509,68 @@ ramię, **#11** ten wpis.
   detekcja w trakcie jazdy, zasięg powyżej 1 m.
 - Szyszka przy lewej krawędzi kadru nie jest wykrywana — patrz pułapki,
   to ograniczenie stereo, nie progów.
+
+### 2026-09-25 — sesja Claude (Pi 5: pierwsze uruchomienie całości + próby chwytu)
+
+**Stos na Pi (venv `.venv`, Python 3.12) — co i jak zainstalowane:**
+- `torch` CPU-only z `--index-url https://download.pytorch.org/whl/cpu`
+  (zwykły `torch` z PyPI na aarch64 ciągnie ~2 GB paczek CUDA i pada na
+  timeoucie — Pi nie ma GPU NVIDIA).
+- `lerobot==0.6.1` z `--no-deps`, potem ręcznie: `draccus mergedeep
+  typing_inspect mypy_extensions tqdm huggingface_hub feetech-servo-sdk
+  deepdiff cachebox orderly-set flit_core`. Część offline: `pip download`
+  na Windows (`--platform manylinux2014_aarch64 --python-version 312
+  --implementation cp --abi cp312 --only-binary=:all:` dla binarnych,
+  sdist dla czystego Pythona), `scp` na Pi, `uv pip install --no-deps
+  --no-build-isolation <plik>`.
+- `pyrealsense2` — jest gotowy wheel arm64, budowa ze źródeł NIEPOTRZEBNA.
+- `ikpy`, `opencv-python-headless`, `pyserial`, `websockets`, `scipy`.
+
+**Nowe pliki:** `arm.sh` (skrót do `arm_control.py` na Pi),
+`rs_mjpeg_server.py` (podgląd kamery w przeglądarce, Pi jest headless),
+`rs_snapshot.py`, `drive_step.py` (krok kołami surowym protokołem Xiao,
+omija `drive_to_target.py`), `auto_collect.py` (pętla skan→krok→skan→
+chwyt), `record_demo.py` / `replay_demo.py` / `demo.csv` (nagranie i
+odtworzenie ręcznego chwytu).
+
+**Zmiany:** nowa kalibracja serw; `HOME_POSE` = pozycja spoczynkowa po
+tej kalibracji (ta sama w `approach_and_grasp.START_POSE_DEG`);
+`approach_and_grasp.execute_plan` wysyła bezpośrednie komendy
+(`max_relative_target=None`, bez interpolacji, do 3 powtórek na krok).
+
+**ZAMIANA ID SERW (najważniejsze):** komenda `shoulder_lift` ruszała
+fizycznie łokciem. Serwo id=2 to ŁOKIEĆ, id=3 to BARK. Poprawione w
+`~/.cache/huggingface/lerobot/calibration/robots/so_follower/so101.json`
+NA PI (poza repo!) — zamienione całe wpisy `shoulder_lift`/`elbow_flex`.
+Wartości w `HOME_POSE`, `demo.csv`, `replay_demo.py` przepisane pod
+poprawne nazwy. **Przy ponownej kalibracji (`calibrate`) lerobot zapisze
+znów id=2 jako shoulder_lift** — trzeba albo przeprogramować ID serw,
+albo ponownie zamienić wpisy w pliku.
+
+**Nie zrobione:** chwyt po poprawce ID; potwierdzenie wzrokowe zamiany;
+kalibracja kamera→ramię; internet na Pi; `teleop_mirror.py` (nie z tej
+sesji) — niezacommitowany, leży lokalnie.
+
+**Pułapki z tej sesji:**
+- **Nie wyciągać pendrive'a z działającego Pi** — to dysk systemowy;
+  SSH umiera ("kex_exchange_identification"), sieć jeszcze odpowiada.
+- **Pi 5 + D415 na słabym zasilaniu** znika z sieci; na powerbanku działa.
+- **Sieć `hacker-bloc` ma tylko IPv6**, GitHub tylko IPv4 → ani `git
+  pull`, ani ICS dla Pi. Hotspot telefonu daje IPv4.
+- **`pkill -f nazwa` przez SSH zabija sam siebie**, gdy nazwa jest w
+  treści komendy (exit 255). Użyj `fuser -k 8080/tcp` albo PID.
+- **Interpolowane ruchy (`move_to` steps>1) zapychają magistralę**
+  ("There is no status packet!") przy dużych kątach — bezpośrednie
+  `send_action` z `max_relative_target=None` + powtórki są niezawodne.
+- **Ostrzeżenia "clamped" z kątami zmieniającymi znak** przy ±180° to
+  zawijanie reprezentacji, nie zły kierunek.
+- **Każde `connect()` na chwilę wyłącza torque** (`configure()`) — ramię
+  może opaść pod grawitacją między wywołaniami. Rób sekwencje w jednym
+  połączeniu.
+- **`scan_cones.py` bez szyszki nadpisuje `cel.json` pustą listą** —
+  zapisz dobry skan zanim podjedziesz w martwą strefę.
+- **`cel.json` pole `angle_deg` to obrót chwytaka**, kierunek do celu to
+  `bearing_deg`.
+- **`drive_to_target.py` na Pi nie działa**: wymaga pakietu `makarena`
+  spoza repo (ścieżka `C:\Users\Modern 14\makarena`) i odmawia jazdy
+  bez zmierzonej kalibracji. Zamiast niego `drive_step.py`.

@@ -62,13 +62,13 @@ CHAIN_BASE_LINK = "base_link"
 # poprawienia po kalibracji - w zerach ramie stoi wyprostowane poziomo (chwytak
 # 0.39 m przed baza), co nie jest szczegolnie bezpieczna poza transportowa.
 START_POSE_DEG = {
-    "shoulder_pan": 0.0,
-    "shoulder_lift": 0.0,
-    "elbow_flex": 0.0,
-    "wrist_flex": 0.0,
-    "wrist_roll": 0.0,
+    "shoulder_pan": -0.66,
+    "shoulder_lift": 98.42,
+    "elbow_flex": 150.81,
+    "wrist_flex": -102.11,
+    "wrist_roll": 89.71,
 }
-START_GRIPPER_CMD = 50.0
+START_GRIPPER_CMD = 0.98
 
 # Geometria chwytu
 GRASP_HEIGHT_FRACTION = 0.5  # na jakiej wysokosci szyszki lapiemy (0.5 = w polowie)
@@ -950,13 +950,26 @@ def execute_plan(plan: dict, port: str, arm_id: str, steps_per_move: int, settle
     import time
 
     print(f"RUCH: port {port}, id {arm_id}. Ctrl+C przerywa.")
-    robot = arm_control.make_arm(port=port, arm_id=arm_id)
+    # max_relative_target=None: interpolowane ruchy (steps>1) robia dodatkowy
+    # sync_read Present_Position na kazdy send_action, co przy szybkich krokach
+    # zapycha magistrale Feetech ("There is no status packet!"). Bezposrednia,
+    # pojedyncza komenda na krok (z paroma powtorkami do zbieznosci) jest
+    # niezawodna - to samo obejscie co w arm_control.dance()/gong().
+    robot = arm_control.make_arm(port=port, arm_id=arm_id, max_relative_target=None)
     robot.connect(calibrate=False)
     try:
         for number, step in enumerate(plan["kroki"], start=1):
             print(f"  krok {number}/{len(plan['kroki'])}: {step['nazwa']}")
-            arm_control.move_to(robot, step["lerobot"], steps=steps_per_move)
-            time.sleep(settle_s)
+            action = {f"{name}.pos": val for name, val in step["lerobot"].items()}
+            for attempt in range(3):
+                robot.send_action(action)
+                time.sleep(settle_s)
+                current = arm_control.read_joint_positions(robot)
+                close_enough = all(
+                    abs(current.get(name, val) - val) < 3.0 for name, val in step["lerobot"].items()
+                )
+                if close_enough:
+                    break
     finally:
         robot.disconnect()
     print("Sekwencja wykonana.")

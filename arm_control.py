@@ -37,12 +37,12 @@ JOINT_NAMES = [
 # Bezpieczna pozycja spoczynkowa - PO KALIBRACJI dobierz recznie i podmien te wartosci
 # (np. przez `python arm_control.py status` w kilku pozach i spisanie wygodnej).
 HOME_POSE = {
-    "shoulder_pan": 0.84,
-    "shoulder_lift": 0.70,
-    "elbow_flex": -0.13,
-    "wrist_flex": 70.42,
-    "wrist_roll": 95.87,
-    "gripper": 1.33,
+    "shoulder_pan": -0.66,
+    "shoulder_lift": 98.42,
+    "elbow_flex": 150.81,
+    "wrist_flex": -102.11,
+    "wrist_roll": 89.71,
+    "gripper": 0.98,
 }
 
 # Limit ruchu na jedno wywolanie send_action (stopnie / jednostki motoru) - zabezpieczenie
