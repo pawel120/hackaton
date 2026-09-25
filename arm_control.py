@@ -34,15 +34,16 @@ JOINT_NAMES = [
     "gripper",
 ]
 
-# Bezpieczna pozycja spoczynkowa - PO KALIBRACJI dobierz recznie i podmien te wartosci
-# (np. przez `python arm_control.py status` w kilku pozach i spisanie wygodnej).
+# Pozycja spoczynkowa (ramie zlozone) - pierwsza klatka demo2_fixed.csv, pod kalibracja
+# z fix_shoulder_offset.py (2026-09-25). Po kazdej zmianie kalibracji spisz na nowo
+# przez `./arm.sh status` w zlozonej pozie.
 HOME_POSE = {
-    "shoulder_pan": -0.66,
-    "shoulder_lift": 98.42,
-    "elbow_flex": 150.81,
+    "shoulder_pan": 1.27,
+    "shoulder_lift": -85.05,
+    "elbow_flex": 99.0,
     "wrist_flex": -102.11,
-    "wrist_roll": 89.71,
-    "gripper": 0.98,
+    "wrist_roll": 89.10,
+    "gripper": 1.69,
 }
 
 # Limit ruchu na jedno wywolanie send_action (stopnie / jednostki motoru) - zabezpieczenie

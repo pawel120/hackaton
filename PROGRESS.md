@@ -4,27 +4,31 @@ Wspólny log sesji na tym repo. Każda nowa sesja/agent dopisuje sekcję na
 dole z datą, co zrobiła i w jakim stanie to zostawiła. Nie nadpisuj
 cudzych wpisów.
 
-## NASTĘPNY KROK (aktualne na 2026-09-25, koniec sesji "Pi 5: pierwsze uruchomienie całości")
+## NASTĘPNY KROK (aktualne na 2026-09-25, koniec sesji "replay chwytu + naprawa kalibracji barku")
 
-Wszystko (kamera D415, ramię SO-101, Xiao napędu) jest podłączone do Pi 5
-i działa z Pi. Pierwsza realna próba chwytu szyszki: nieudana, ale
-znaleziona przyczyna (zamienione ID serw, patrz niżej) — PO tej poprawce
-chwyt nie był jeszcze ponownie próbowany.
+Ramię odtwarza ręcznie nagrany chwyt szyszki (`replay_csv.py
+demo2_fixed.csv`) bez jazdy "naokoło". Przyczyna wcześniejszych
+porażek znaleziona i naprawiona (patrz wpis sesji na dole) — **teza
+"ID serw są zamienione" z poprzedniej sesji była BŁĘDNA.**
 
 **Najważniejsze na start następnej sesji (w tej kolejności):**
-1. **Potwierdzić zamianę ID serw.** `./arm.sh move shoulder_lift=<obecna+10>`
-   musi ruszyć BARKIEM (2. przegub od podstawy), a `elbow_flex` ŁOKCIEM.
-   Ostatni test po zamianie: shoulder_lift 128→139, elbow bez zmian, ale
-   użytkownik nie zdążył potwierdzić wzrokowo.
-2. Jeśli OK: `./arm.sh home`, potem `approach_and_grasp.py --no-drive`
-   (dry-run) i na żywo z `--port /dev/robot-arm`. IK wcześniej "nie
-   działało", bo komendy barku szły do łokcia — z poprawnym ID ma szansę.
-3. Jeśli IK dalej chybia: `replay_demo.py` (odtworzenie ręcznej
-   demonstracji, bez IK) — działa tylko dla tej samej pozycji szyszki.
+1. `./arm.sh home` — `HOME_POSE` przepisany pod nową kalibrację (ramię
+   złożone, bark −85°, łokieć 99°). Sprawdzić, że dojeżdża bez szarpania.
+2. Chwyt z nagrania: `python replay_csv.py demo2_fixed.csv --port
+   /dev/robot-arm --start 9.5 --end 23`. Działa tylko dla tej samej
+   pozycji szyszki co przy nagraniu. Nowe nagranie: `record_demo.py`
+   (startuje z home), potem `replay_csv.py <plik> --start/--end`.
+3. IK (`approach_and_grasp.py`): zera barku/łokcia po nowej kalibracji
+   NIE są sprawdzone względem zer URDF — najpierw zweryfikować (np.
+   `./arm.sh straight` i porównać z pozą zerową URDF), dopiero potem chwyt.
 4. Zmierzyć realnie przejazd na krok (`drive_step.py`) miarką i wpisać do
    `auto_collect.py` (teraz szacunek ~1 m/s przy PWM 150).
 5. Internet na Pi (patrz "Jak się połączyć") — bez niego `git pull` na Pi
    nie działa, pliki idą przez `scp`.
+
+**NIE uruchamiać `lerobot calibrate`** — nadpisze ręcznie poprawiony
+offset barku (id2) i zakres znów przejdzie przez zero enkodera. Backup
+pliku sprzed poprawki: `~/so101.json.bak-204746` na Pi.
 
 ### Jak się połączyć z Pi (stan na koniec sesji)
 
@@ -538,14 +542,12 @@ tej kalibracji (ta sama w `approach_and_grasp.START_POSE_DEG`);
 `approach_and_grasp.execute_plan` wysyła bezpośrednie komendy
 (`max_relative_target=None`, bez interpolacji, do 3 powtórek na krok).
 
-**ZAMIANA ID SERW (najważniejsze):** komenda `shoulder_lift` ruszała
-fizycznie łokciem. Serwo id=2 to ŁOKIEĆ, id=3 to BARK. Poprawione w
-`~/.cache/huggingface/lerobot/calibration/robots/so_follower/so101.json`
-NA PI (poza repo!) — zamienione całe wpisy `shoulder_lift`/`elbow_flex`.
-Wartości w `HOME_POSE`, `demo.csv`, `replay_demo.py` przepisane pod
-poprawne nazwy. **Przy ponownej kalibracji (`calibrate`) lerobot zapisze
-znów id=2 jako shoulder_lift** — trzeba albo przeprogramować ID serw,
-albo ponownie zamienić wpisy w pliku.
+**ZAMIANA ID SERW — BŁĘDNA DIAGNOZA (sprostowane w następnej sesji):**
+uznaliśmy, że id=2 to łokieć, a id=3 bark, i zamieniliśmy wpisy
+`shoulder_lift`/`elbow_flex` w pliku kalibracji na Pi. lerobot ignoruje
+jednak pole `id` z pliku (nazwy→ID są na sztywno w `so_follower.py`),
+więc zamieniły się tylko offsety/zakresy między przegubami — stąd dalej
+"zły kierunek". Patrz wpis "Replay chwytu + naprawa kalibracji barku".
 
 **Nie zrobione:** chwyt po poprawce ID; potwierdzenie wzrokowe zamiany;
 kalibracja kamera→ramię; internet na Pi; `teleop_mirror.py` (nie z tej
@@ -562,8 +564,9 @@ sesji) — niezacommitowany, leży lokalnie.
 - **Interpolowane ruchy (`move_to` steps>1) zapychają magistralę**
   ("There is no status packet!") przy dużych kątach — bezpośrednie
   `send_action` z `max_relative_target=None` + powtórki są niezawodne.
-- **Ostrzeżenia "clamped" z kątami zmieniającymi znak** przy ±180° to
-  zawijanie reprezentacji, nie zły kierunek.
+- ~~Ostrzeżenia "clamped" z kątami zmieniającymi znak przy ±180° to
+  zawijanie reprezentacji, nie zły kierunek.~~ BŁĄD: to był objaw zakresu
+  barku przechodzącego przez zero enkodera (patrz następna sesja).
 - **Każde `connect()` na chwilę wyłącza torque** (`configure()`) — ramię
   może opaść pod grawitacją między wywołaniami. Rób sekwencje w jednym
   połączeniu.
@@ -574,3 +577,44 @@ sesji) — niezacommitowany, leży lokalnie.
 - **`drive_to_target.py` na Pi nie działa**: wymaga pakietu `makarena`
   spoza repo (ścieżka `C:\Users\Modern 14\makarena`) i odmawia jazdy
   bez zmierzonej kalibracji. Zamiast niego `drive_step.py`.
+
+## 2026-09-25 — Replay chwytu + naprawa kalibracji barku
+
+**Co było źle:** każda próba (home, replay_demo, IK) jechała barkiem w
+złą stronę. Dwie przyczyny naraz:
+1. **lerobot adresuje serwa po nazwie ze sztywnej listy**
+   (`lerobot/robots/so_follower/so_follower.py`: `shoulder_lift`=id2,
+   `elbow_flex`=id3). Pole `"id"` w `so101.json` jest IGNOROWANE. "Zamiana
+   ID" z poprzedniej sesji zamieniła tylko offsety/zakresy → każdy z dwóch
+   przegubów był normalizowany zakresem drugiego. Nie naprawiać mapowania
+   przez edycję JSON-a.
+2. **Fizyczny zakres id2 (shoulder_lift) przechodził przez zero enkodera**
+   (Present 4095→0). Serwo w trybie pozycji nie przejdzie przez 0, więc
+   do celu po drugiej stronie jechało "naokoło", w podłogę. Widać to w
+   nagraniu: opadający bark −82 → −151 → **+139** → 128.
+
+**Naprawa (bez ręcznej kalibracji, policzone z nagrania `demo2.csv`):**
+`fix_shoulder_offset.py` — id2: `Homing_Offset` 1977 (≡ −2119, przesunięcie
++1418 ticków), limity 1006..3089 (środek ~2047, bez przejścia przez zero);
+id3: przywrócone rejestry sprzed sesji (1159, 1168..3423). Zapisane w EEPROM
+serw i w `so101.json` na Pi. Tworzy też `demo2_fixed.csv` (nagranie
+przeliczone do nowej kalibracji).
+
+**Nowe pliki:** `replay_csv.py` (odtwarza całą trajektorię z CSV klatka po
+klatce w tempie nagrania — małe kroki, bez interpolacji między dalekimi
+punktami), `fix_shoulder_offset.py`, `demo2.csv` / `demo2_fixed.csv`.
+`HOME_POSE` / `START_POSE_DEG` = pierwsza klatka `demo2_fixed.csv`.
+`replay_demo.py` + `demo.csv` oznaczone jako nieaktualne.
+
+**Wynik:** `replay_csv.py demo2_fixed.csv --start 9.5 --end 23` przeszedł
+całą trajektorię, koniec w pozycji z nagrania (±1°), bez błędów magistrali.
+
+**Pułapki:**
+- `record_demo.py` najpierw wysyła home — przy złej kalibracji home nie
+  dojeżdża i nagranie startuje z innej pozy (tak było z `demo2.csv`,
+  pierwsze ~4 s to opadanie ramienia; replay od `--start 9.5`).
+- Przed zmianą rejestrów: `bus.disable_torque()` (zdejmuje też `Lock`),
+  inaczej zapis EEPROM nie wejdzie.
+- `Homing_Offset` na Feetech ma zakres ±2047 — większe przesunięcia licz
+  modulo 4096.
+

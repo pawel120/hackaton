@@ -1,5 +1,8 @@
 """Odtwarza chwyt na podstawie recznej demonstracji (demo.csv z record_demo.py).
 
+NIEAKTUALNE od 2026-09-25: WAYPOINTS sa sprzed fix_shoulder_offset.py (zla
+kalibracja barku/lokcia) i pojada zle. Uzywaj replay_csv.py demo2_fixed.csv.
+
 Zapasowa sciezka obok approach_and_grasp.py (IK): bierze
 kilka kluczowych punktow WPROST z ruchu, ktory czlowiek fizycznie wykonal
 recznie (torque off), i odtwarza je bezposrednimi komendami (bez interpolacji -

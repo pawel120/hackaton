@@ -58,17 +58,17 @@ GRIPPER_JOINT = "gripper"
 CHAIN_BASE_LINK = "base_link"
 
 # Poza wyjsciowa. Te same wartosci co HOME_POSE w arm_control.py, zeby nie
-# miec dwoch roznych "pozycji spoczynkowej". UWAGA: tam to tez placeholder do
-# poprawienia po kalibracji - w zerach ramie stoi wyprostowane poziomo (chwytak
-# 0.39 m przed baza), co nie jest szczegolnie bezpieczna poza transportowa.
+# miec dwoch roznych "pozycji spoczynkowej". UWAGA: po fix_shoulder_offset.py
+# (2026-09-25) zera barku/lokcia z kalibracji NIE sa sprawdzone wzgledem zer URDF,
+# wiec plan IK moze byc przesuniety o stala - zweryfikowac przed chwytem przez IK.
 START_POSE_DEG = {
-    "shoulder_pan": -0.66,
-    "shoulder_lift": 98.42,
-    "elbow_flex": 150.81,
+    "shoulder_pan": 1.27,
+    "shoulder_lift": -85.05,
+    "elbow_flex": 99.0,
     "wrist_flex": -102.11,
-    "wrist_roll": 89.71,
+    "wrist_roll": 89.10,
 }
-START_GRIPPER_CMD = 0.98
+START_GRIPPER_CMD = 1.69
 
 # Geometria chwytu
 GRASP_HEIGHT_FRACTION = 0.5  # na jakiej wysokosci szyszki lapiemy (0.5 = w polowie)
