@@ -1,0 +1,28 @@
+# Zaleznosci nowego deterministycznego stosu pinecone_bot/.
+#
+#     python -m pip install -r requirements-pinecone.txt
+#
+# To wystarcza do pracy na laptopie: python -m pinecone_bot.main --sim --show
+# oraz python -m pytest tests -q. Zadnego sprzetu nie trzeba.
+
+numpy
+opencv-python
+pyserial
+pytest
+
+# --- Raspberry Pi (kamera + ramie) -----------------------------------------
+# Ponizsze NIE sa instalowane tym plikiem - zespol ma je juz w
+# requirements-pi.txt, uzywanym na Pi zamiast tego pliku (albo obok niego).
+#
+# pyrealsense2 - D415. Na Raspberry Pi 5 (aarch64) najczesciej trzeba
+#   zbudowac librealsense ze zrodel, bo nie ma gotowego kola (wheel) na PyPI
+#   dla tej architektury; jesli akurat jest, prostszy wariant to
+#   `uv pip install pyrealsense2`. Patrz deploy/setup_pi.sh (krok "RealSense
+#   Python bindings") - probuje kola, a przy niepowodzeniu mowi, co zrobic.
+#
+# lerobot - sterowanie ramieniem SO-101 (pinecone_bot/arm.py, driver
+#   "waypoints"). Zespol trzyma pinowana wersje w requirements-pi.txt
+#   (lerobot==0.6.1) - nie duplikowac tu innej wersji, zeby nie rozjechac
+#   sie z tym, co jest juz zainstalowane na Pi.
+#
+# Instalacja na Pi: patrz requirements-pi.txt i deploy/setup_pi.sh.

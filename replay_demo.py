@@ -26,7 +26,7 @@ import arm_control as ac
 # Punkty z demo.csv (nagranie reczne 2026-09-25), shoulder_lift/elbow_flex juz
 # po korekcie zamienionych ID serw (patrz PROGRESS.md). Kolejnosc: home -> siegniecie
 # w strone szyszki (elbow_flex blisko minimum = najdalszy wysieg) -> zamkniecie
-# chwytaka na szyszce -> powrot do home z zaciśnietym chwytakiem.
+# chwytaka na szyszce -> powrot do home z zacisnietym chwytakiem.
 WAYPOINTS = [
     ("start (home)", {
         "shoulder_pan": -0.13, "shoulder_lift": 96.75, "elbow_flex": 152.31,

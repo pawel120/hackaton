@@ -1,0 +1,27 @@
+{
+  "name": "grasp_mid",
+  "note": "przeniesione z replay_demo.py; nagrane PRZED naprawa barku (fix_shoulder_offset.py 2026-09-25), do ponownego nagrania na sprzecie: tools/record_waypoints.py --name grasp_mid. UWAGA: cel gripper=12 w kroku zacisku jest POWYZEJ empty_gripper_below (6), wiec pusty chwytak tez odczyta ~12 i check_gripper nie wykryje braku szyszki; przy nagrywaniu ustaw cel zacisku na 0 (record_waypoints proponuje to domyslnie).",
+  "waypoints": [
+    {
+      "label": "start (home)",
+      "pose": {"shoulder_pan": -0.13, "shoulder_lift": 96.75, "elbow_flex": 152.31, "wrist_flex": -101.41, "wrist_roll": 89.27, "gripper": 1.11},
+      "seconds": 1.5
+    },
+    {
+      "label": "wysiegniecie nad szyszka",
+      "pose": {"shoulder_pan": -8.22, "shoulder_lift": 34.95, "elbow_flex": -62.11, "wrist_flex": -13.05, "wrist_roll": 89.45, "gripper": 30.0},
+      "seconds": 1.5
+    },
+    {
+      "label": "max wysiegniecie / zacisk",
+      "pose": {"shoulder_pan": -6.2, "shoulder_lift": -5.49, "elbow_flex": -95.52, "wrist_flex": 12.79, "wrist_roll": 89.71, "gripper": 12.0},
+      "seconds": 1.5,
+      "check_gripper": true
+    },
+    {
+      "label": "powrot do home z szyszka",
+      "pose": {"shoulder_pan": -0.13, "shoulder_lift": 96.75, "elbow_flex": 152.31, "wrist_flex": -101.41, "wrist_roll": 89.27, "gripper": 15.0},
+      "seconds": 1.5
+    }
+  ]
+}
