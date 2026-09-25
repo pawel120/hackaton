@@ -1,0 +1,105 @@
+{
+  "image_w": 640,
+  "image_h": 480,
+  "cx": 320.0,
+  "grasps": [
+    {
+      "name": "grasp_near",
+      "target_row": 400.0,
+      "forward_m": 0.28
+    },
+    {
+      "name": "grasp_mid",
+      "target_row": 360.0,
+      "forward_m": 0.33
+    },
+    {
+      "name": "grasp_far",
+      "target_row": 325.0,
+      "forward_m": 0.38
+    }
+  ],
+  "detector": {
+    "hsv": {
+      "lo": [
+        5,
+        60,
+        20
+      ],
+      "hi": [
+        25,
+        255,
+        200
+      ]
+    },
+    "min_area_px": 60,
+    "max_area_px": 40000,
+    "blur_ksize": 5,
+    "morph_ksize": 5,
+    "border_px": 3,
+    "grasp_zone_rows": 40.0
+  },
+  "control": {
+    "kx": 0.004,
+    "ky": 0.0025,
+    "steer_sign": 1.0,
+    "v_max": 0.25,
+    "v_min": -0.1,
+    "w_max": 0.6,
+    "deadband_px": 3.0,
+    "tol_x_px": 8.0,
+    "tol_y_px": 8.0,
+    "settle_frames": 3,
+    "lost_timeout_s": 2.0,
+    "lost_hold_s": 0.25,
+    "far_row_frac": 0.35,
+    "far_creep_v": 0.1,
+    "search_w": 0.35,
+    "search_pattern": "lanes",
+    "lane_length_m": 3.0,
+    "lane_count": 4,
+    "lane_spacing_m": 1.0,
+    "search_drive_m": 0.8,
+    "search_drive_v": 0.15,
+    "search_timeout_s": 90.0,
+    "retries": 2,
+    "retry_back_s": 1.2,
+    "retry_back_v": -0.08,
+    "loop_hz": 15.0,
+    "track_max_jump_px": 120.0
+  },
+  "base": {
+    "driver": "xiao",
+    "port": "/dev/robot-drive",
+    "baud": 115200,
+    "wheel_base_m": 0.5,
+    "xiao_pwm_min": 80,
+    "xiao_pwm_max": 260,
+    "xiao_steer_min": 60,
+    "xiao_steer_max": 220,
+    "xiao_period_s": 0.08,
+    "bip_period_s": 0.05,
+    "bip_hall_every": 4
+  },
+  "arm": {
+    "driver": "waypoints",
+    "port": "/dev/robot-arm",
+    "arm_id": "so101",
+    "motions_dir": "motions",
+    "subprocess_cmd": "python replay_demo.py --port {port}",
+    "empty_gripper_below": 6.0
+  },
+  "sim": {
+    "cam_height_m": 0.45,
+    "cam_pitch_deg": 38.0,
+    "cam_forward_m": -0.1,
+    "fx": 600.0,
+    "fy": 600.0,
+    "cone_radius_m": 0.03,
+    "noise_px": 1.0,
+    "field_m": 2.2,
+    "n_cones": 5,
+    "seed": 1
+  },
+  "log_csv": "pinecone_log.csv"
+}

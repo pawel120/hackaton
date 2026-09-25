@@ -1,0 +1,11 @@
+{
+  "name": "home",
+  "note": "HOME_POSE z arm_control.py (kalibracja po fix_shoulder_offset.py, 2026-09-25). Po kazdej zmianie kalibracji serw przepisac razem z arm_control.HOME_POSE.",
+  "waypoints": [
+    {
+      "label": "home",
+      "pose": {"shoulder_pan": 1.27, "shoulder_lift": -85.05, "elbow_flex": 99.0, "wrist_flex": -102.11, "wrist_roll": 89.1, "gripper": 1.69},
+      "seconds": 2.0
+    }
+  ]
+}

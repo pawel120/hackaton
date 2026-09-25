@@ -642,7 +642,7 @@ def start_pipeline(width: int, height: int, fps: int, laser_power: float | None 
         ) from exc
     sensor = profile.get_device().first_depth_sensor()
     if laser_power is not None and sensor.supports(rs.option.laser_power):
-        # Projektor IR dokłada teksture na jednolite powierzchnie. Sztuczna
+        # Projektor IR doklada teksture na jednolite powierzchnie. Sztuczna
         # trawa o zmierzchu prawie nie ma kontrastu wlasnego i stereo gubi
         # punkty zaczepienia. Zmierzone: moc 150 (domyslna) dawala 31.0%
         # pokrycia glebia na murawie, moc 360 dala 35.8%. Martwego pasa przy

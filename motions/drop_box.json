@@ -1,0 +1,26 @@
+{
+  "name": "drop_box",
+  "note": "PLACEHOLDER, nie nagrane na sprzecie. Zalozenie: pojemnik po lewej stronie ramienia (shoulder_pan +90 od HOME_POSE, zakres pan wg DANCE_RANGE to ok. +-109). Po zamontowaniu pojemnika nagrac: tools/record_waypoints.py --name drop_box. Start z HOME_POSE z zacisnietym chwytakiem (po grasp_*), koniec w HOME_POSE.",
+  "waypoints": [
+    {
+      "label": "home z szyszka",
+      "pose": {"shoulder_pan": 1.27, "shoulder_lift": -85.05, "elbow_flex": 99.0, "wrist_flex": -102.11, "wrist_roll": 89.1, "gripper": 15.0},
+      "seconds": 1.0
+    },
+    {
+      "label": "obrot nad pojemnik",
+      "pose": {"shoulder_pan": 91.27, "shoulder_lift": -85.05, "elbow_flex": 99.0, "wrist_flex": -102.11, "wrist_roll": 89.1, "gripper": 15.0},
+      "seconds": 2.0
+    },
+    {
+      "label": "otworz (wypusc szyszke)",
+      "pose": {"shoulder_pan": 91.27, "shoulder_lift": -85.05, "elbow_flex": 99.0, "wrist_flex": -102.11, "wrist_roll": 89.1, "gripper": 100.0},
+      "seconds": 1.0
+    },
+    {
+      "label": "powrot do home",
+      "pose": {"shoulder_pan": 1.27, "shoulder_lift": -85.05, "elbow_flex": 99.0, "wrist_flex": -102.11, "wrist_roll": 89.1, "gripper": 1.69},
+      "seconds": 2.0
+    }
+  ]
+}
