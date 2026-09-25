@@ -31,10 +31,16 @@ def main() -> None:
     parser.add_argument("--start", type=float, default=0.0, help="od ktorej sekundy nagrania")
     parser.add_argument("--end", type=float, default=1e9, help="do ktorej sekundy nagrania")
     parser.add_argument("--approach", type=float, default=3.0, help="czas dojazdu do 1. klatki [s]")
+    parser.add_argument("--pause-at", type=float, default=None, help="zatrzymaj sie na klatce z tej sekundy nagrania")
+    parser.add_argument("--pause", type=float, default=10.0, help="jak dlugo trzymac poze przy --pause-at [s]")
+    parser.add_argument("--pan-offset", type=float, default=0.0,
+                        help="dodaj do shoulder_pan w kazdej klatce [st] - obrot calego ruchu w bok")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
     frames = load(args.csv, args.start, args.end)
+    for fr in frames:
+        fr["shoulder_pan"] += args.pan_offset
     print(f"{len(frames)} klatek, t={frames[0]['t']:.1f}..{frames[-1]['t']:.1f} s")
     first = {k: frames[0][k] for k in ac.JOINT_NAMES}
     print("Pierwsza klatka:", first)
@@ -57,11 +63,18 @@ def main() -> None:
         print("Na 1. klatce:", ac.read_joint_positions(arm))
 
         t0 = time.monotonic()
+        paused = args.pause_at is None
         for fr in frames:
             wait = (fr["t"] - frames[0]["t"]) - (time.monotonic() - t0)
             if wait > 0:
                 time.sleep(wait)
             arm.send_action({f"{k}.pos": fr[k] for k in ac.JOINT_NAMES})
+            if not paused and fr["t"] >= args.pause_at:
+                paused = True
+                time.sleep(0.8)
+                print(f"PAUZA na t={fr['t']:.1f} przez {args.pause:.0f} s:", ac.read_joint_positions(arm), flush=True)
+                time.sleep(args.pause)
+                t0 += args.pause + 0.8
         time.sleep(1.5)
         print("Koniec:", ac.read_joint_positions(arm))
     finally:

@@ -13,16 +13,17 @@ porażek znaleziona i naprawiona (patrz wpis sesji na dole) — **teza
 
 **Najważniejsze na start następnej sesji (w tej kolejności):**
 1. `./arm.sh home` — `HOME_POSE` przepisany pod nową kalibrację (ramię
-   złożone, bark −85°, łokieć 99°). Sprawdzić, że dojeżdża bez szarpania.
-2. Chwyt z nagrania: `python replay_csv.py demo2_fixed.csv --port
-   /dev/robot-arm --start 9.5 --end 23`. Działa tylko dla tej samej
-   pozycji szyszki co przy nagraniu. Nowe nagranie: `record_demo.py`
-   (startuje z home), potem `replay_csv.py <plik> --start/--end`.
-3. IK (`approach_and_grasp.py`): zera barku/łokcia po nowej kalibracji
-   NIE są sprawdzone względem zer URDF — najpierw zweryfikować (np.
-   `./arm.sh straight` i porównać z pozą zerową URDF), dopiero potem chwyt.
-4. Zmierzyć realnie przejazd na krok (`drive_step.py`) miarką i wpisać do
-   `auto_collect.py` (teraz szacunek ~1 m/s przy PWM 150).
+   złożone, bark −85°, łokieć 99°).
+2. **Chwyt z kamerą jeszcze NIE trafił** (5 prób, patrz wpis "Chwyt z
+   kamerą: skan → podjazd → replay" na dole). Procedura jest gotowa, brakuje
+   dokładności podjazdu na ślepo i potwierdzenia, gdzie chwytak ląduje w bok.
+   Następna próba: w pauzie (`--pause-at 14.8 --pause 10`) zmierzyć
+   suwmiarką, gdzie są szczęki względem szyszki (przód/tył, lewo/prawo),
+   i z tego poprawić kotwicę (17 cm) oraz znak/skalę obrotu podstawy.
+3. Skalibrować krok kół: `drive_step.py` jest mocno nieliniowy (niżej).
+   Najlepiej zmierzyć kamerą kilka kroków 0.1 s na szyszce 0.4–0.6 m.
+4. IK (`approach_and_grasp.py`): zera barku/łokcia po nowej kalibracji
+   NIE są sprawdzone względem zer URDF.
 5. Internet na Pi (patrz "Jak się połączyć") — bez niego `git pull` na Pi
    nie działa, pliki idą przez `scp`.
 
@@ -617,4 +618,48 @@ całą trajektorię, koniec w pozycji z nagrania (±1°), bez błędów magistra
   inaczej zapis EEPROM nie wejdzie.
 - `Homing_Offset` na Feetech ma zakres ±2047 — większe przesunięcia licz
   modulo 4096.
+
+## 2026-09-25 — Chwyt z kamerą: skan → podjazd → replay (nieudany, 5 prób)
+
+**Pomysł:** bez IK. Jedyny pewny chwyt to nagranie `demo2_fixed.csv`
+(klatka chwytu t=14.8 s: pan −13.6, bark 86.3, łokieć −3.6, nadgarstek
+53.8, chwytak otwarty 45). Kamera mierzy szyszkę, robot podjeżdża tak,
+żeby szyszka znalazła się w punkcie chwytu, a różnicę w bok nadrabia
+obrót podstawy (`replay_csv.py --pan-offset`).
+
+**Ustalenia (zmierzone):**
+- **Punkt zamknięcia szczęk jest 17 cm przed kamerą** (suwmiarka,
+  użytkownik). Kamera widzi głębię dopiero od ~0.31 m, więc szyszka w
+  chwili chwytu jest ZAWSZE w martwej strefie — ostatni odcinek jedzie
+  się na ślepo. Punktu chwytu nie da się też zobaczyć "na żywo": przy
+  pozie chwytu ramię zasłania kamerę (przedramię ~0.31 m przed obiektywem).
+- **Szyszkę widać na RGB, zanim złapie ją głębia** (np. na ~0.3 m jest
+  wyraźnie w kadrze, a detektor głębi nic nie zgłasza). Rozwiązanie
+  użytkownika: cofać, aż głębia ją zmierzy, potem podjechać.
+- **Krok kół `drive_step.py --speed 150` jest nieliniowy:** 0.05 s (jeden
+  tick 80 ms) ≈ 2.9 cm do przodu; 0.1 s ≈ 12.5 cm (jeden pomiar!); do tyłu
+  0.05 s dawało od 0.4 cm do kilku cm. Przy jeździe lekko znosi w bok
+  (raz 1.8 cm na jednym kroku).
+- `scan_cones.py` łapie też buty/fotel — w pętlach filtr `forward < 0.8 m
+  i |lateral| < 0.15 m`.
+
+**Model obrotu podstawy (niezweryfikowany):** `pan = atan(lateral /
+0.25 m)` (17 cm od kamery + ~8 cm kamera→oś podstawy), ujemny pan = w
+lewo; `--pan-offset = pan − (−13.6)`.
+
+**Próby (wszystkie: chwytak wrócił pusty, odczyt ~2):**
+| # | szyszka przed chwytem | pan | co widział użytkownik |
+|---|---|---|---|
+| 1 | 0.322 m, 1.9 cm L (bez podjazdu) | −9.9 | zahaczył, przeciągnął |
+| 2 | 0.306 m, 0.9 cm L (bez podjazdu) | −5.4 | chwytak zamykał się PRZED szyszką |
+| 3 | 0.306 m, 0.9 cm L (bez podjazdu) | −11.4 | j.w. |
+| 4 | 0.310 m → 5×0.05 s (~14.5 cm) | −2.7 | brak informacji |
+| 5 | 0.542 → 0.417 (zmierz.) → 2×0.1 s na ślepo | 0.0 | brak informacji |
+
+Próby 1–3 były oparte na złej kotwicy (0.30 m, zgadnięta ze zdjęcia);
+dopiero pomiar suwmiarką dał 17 cm.
+
+**Zmiany w kodzie:** `replay_csv.py` ma `--pause-at/--pause` (zatrzymanie
+w wybranej klatce z trzymanym torque) i `--pan-offset` (obrót całego
+ruchu w bok).
 
