@@ -189,6 +189,13 @@ Pytania do użytkownika na starcie następnej sesji (nie zgaduj):
 - `test_detect_gates.py`, `test_drive_plan.py`, `test_grasp_plan.py` —
   testy bez sprzętu, zwykły python (bez pytest): `python <plik>`.
 - `so101_urdf/` — model URDF ramienia (do IK, np. przez `ikpy`).
+- `bag_to_rtabmap.py` - nagranie RealSense (`.db3`/`.bag`) na zestaw RGB-D
+  dla RTAB-Map: `rgb/*.jpg`, `depth/*.png` (16-bit mm, zarejestrowana do
+  koloru), `calib/rs_color.yaml`, `stamps.txt`. `--probe` wypisuje samą
+  kalibrację z bagu, `--resume` dokańcza przerwany eksport. Issue #7.
+- `render_map_preview.py` - podgląd chmury `.ply` z RTAB-Map bez open3d:
+  poziomuje mapę do podłogi (RANSAC), widok z góry kolorowany wysokością
+  + widok z ukosa.
 - `constraints.txt` — pin `numpy==2.5.3` dla pip; `lerobot` na Python
   3.14 próbuje przebudować numpy ze źródła i pada (brak wheela + za
   stary GCC w systemie) — instalować z `--no-deps` i doinstalowywać
@@ -334,6 +341,26 @@ Pytania do użytkownika na starcie następnej sesji (nie zgaduj):
   To nie jest wina kabla — na MSI Modern 14 B10MW oba porty Type-A są
   fizycznie 2.0, USB 3 jest tylko na Type-C. 640×480@30 działa i daje
   realnie 18–22 fps, co do skanu na postoju w zupełności wystarcza.
+- **Bag z D415 ma zepsute ekstrinsyki depth→color** (obrót
+  `[1,0,0,0,0,0,0,0,0]`, `get_depth_scale()` z playbacku = 0.0), więc
+  `rs.align()` na playbacku zwraca PUSTĄ głębię (0.00% pikseli). Prawdziwe
+  wartości są w topicach bagu (`Color_0/tf/ref_0`: kolor 14.99 mm w bok od
+  głębi); `bag_to_rtabmap.py` rejestruje głębię sam. Wiadomości w `.db3` są
+  spakowane zstd (magic `28 b5 2f fd`) - do czytania sqlite wprost trzeba
+  `pip install zstandard`.
+- **Playback z `set_real_time(False)` oddaje tę samą klatkę koloru z nową
+  głębią** - w nagraniu 20260925_190138 było tak w 714 z 2611 par
+  (rozsynchronizowane pary). Pomijać, gdy `color.get_frame_number()` się nie
+  zmienił. Timeout `try_wait_for_frames` to też NIE koniec pliku (przy
+  zajętym dysku staje na sekundy) - pytać `playback.current_status()`.
+- **RTAB-Map win64 (0.23.8) pada na starcie z 0xC0000135** (brak DLL, bez
+  komunikatu): dołączony `kinect20.dll` chce VC++ 2012 (`msvcr110.dll`,
+  `msvcp110.dll`). Wystarczy wrzucić 64-bitowe wersje do `bin/` (na tym
+  laptopie skopiowane z `Microsoft Office\root\vfs\System`).
+- **`Odom/ResetCountdown 0` (domyślne) = po pierwszym zgubieniu odometria
+  już nie wraca** i reszta nagrania nie trafia do mapy (u nas od 22 s z 98).
+  Z `1` każde zgubienie to nowa sesja, a sesje skleja tylko loop closure -
+  więc nagranie ręczne musi wracać w już widziane miejsca.
 
 ## Log sesji
 
@@ -662,4 +689,44 @@ dopiero pomiar suwmiarką dał 17 cm.
 **Zmiany w kodzie:** `replay_csv.py` ma `--pause-at/--pause` (zatrzymanie
 w wybranej klatce z trzymanym torque) i `--pan-offset` (obrót całego
 ruchu w bok).
+
+## 2026-09-25 - Mapa RTAB-Map z nagrania pokoju (issue #7, sesja Claude na laptopie)
+
+**Wejście:** `D:\HACKATHON\20260925_190138.db3` (4.7 GB) - rosbag2 z
+RealSense D415, 1280×720 @30, 98.4 s, nagrane z ręki (losowe chodzenie
+po sali, ~0.9 m nad podłogą). Bez IMU i bez odometrii kół.
+
+**Wynik:** `D:\HACKATHON\20260925_190138_rtabmap\wynik\` -
+`mapa_rtabmap.db`, `chmura_punktow.ply` (820 tys. pkt, voxel 1 cm),
+`trajektoria.txt`, `podglad.png`. W jednej spójnej mapie jest **50 z 93
+węzłów (54% nagrania)** - początek i koniec. Środek (węzły 779-1648) to 4
+osobne kawałki bez wizualnego pokrycia z resztą; `detectMoreLoopClosures`
+sprawdził wszystkie pary i nic nie znalazł. Przyczyna w nagraniu: dziury
+1.2-1.6 s bez klatek (t = 62, 74, 85 s), szybkie obroty przy bluszczu, ta
+część sali obejrzana raz. Na podglądzie widać podwójne ściany - resztkowe
+niedopasowanie między sklejonymi sesjami.
+
+**Pipeline (bez ROS, bez GUI):** `bag_to_rtabmap.py` → 1897 par RGB-D →
+`rtabmap-dataRecorder` (ini ze źródłem "RGB-D images") → `rtabmap-reprocess
+-odom` → `rtabmap-detectMoreLoopClosures` → `rtabmap-export`. Całość w
+`run_rtabmap.cmd` w katalogu wyniku, ~20 min. RTAB-Map portable w
+`D:\HACKATHON\tools\bin`.
+
+**Strojenie odometrii (zmierzone):**
+| konfiguracja | zgubione klatki | sesje | największy sklejony kawałek |
+|---|---|---|---|
+| domyślna (ResetCountdown 0) | od kl. 439 do końca | 1 | ~23% nagrania |
+| ResetCountdown 1, MinInliers 12 | 59 | 22 | 2 pozy |
+| + CorType 1 (KLT), MaxFeatures 2000 | 13 | 8 | **50/93 węzłów** ← wybrana |
+| j.w. + ResetCountdown 15 | 81 | 6 | 37/87 węzłów |
+
+**Nie zrobione:** mesh z teksturą, mapa 2D zajętości (`rtabmap-export` jej
+nie ma - do zrobienia w GUI `RTABMap.exe` → Export 2D map albo z chmury),
+nagranie na robocie zamiast z ręki.
+
+**Następny krok dla mapowania:** nagrać jeszcze raz, wolno (obroty
+szczególnie), z powrotem do miejsca startu na końcu (loop closure skleja
+całą pętlę) i sprawdzić, czy nagranie nie gubi klatek (zapis na SSD).
+Pipeline jest gotowy: `python bag_to_rtabmap.py NOWE.db3`, potem
+`run_rtabmap.cmd` z poprawionymi ścieżkami w `rtabmap_source.ini`.
 
