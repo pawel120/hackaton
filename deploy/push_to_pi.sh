@@ -43,7 +43,7 @@ step "Target: $PI_HOST:$PI_DIR"
 if command -v rsync >/dev/null 2>&1; then
   step "Copying with rsync"
   ssh "$PI_HOST" "mkdir -p $PI_DIR"
-  rsync -avz --progress \
+  rsync -avz --progress --delete \
     --exclude '.venv' \
     --exclude '__pycache__' \
     --exclude '*.pyc' \
@@ -63,5 +63,6 @@ step "Done"
 echo "Next, on the Pi:"
 echo "    ssh $PI_HOST"
 echo "    cd $PI_DIR"
-echo "    uv pip install --python .venv/bin/python -r requirements-pi.txt"
-echo "    python -m pinecone_bot.main --dry-run --show"
+echo "    uv pip install --python .venv/bin/python -r requirements-pinecone.txt"
+echo "    python -m pytest tests -q"
+echo "    python -m pinecone_bot.main --dry-run     # --show tylko z pulpitem (nie z opencv-python-headless)"

@@ -104,6 +104,16 @@ class Brain:
         self.base = base
         self.arm = arm
         self.clock = clock or WallClock()
+        # chwyty bez pliku ruchu wypadaja z listy, inaczej replay() konczy sie FileNotFoundError w polowie misji
+        has_motion = getattr(arm, "has_motion", None)
+        if callable(has_motion):
+            missing = [g.name for g in cfg.grasps if not has_motion(g.name)]
+            if missing:
+                print(f"UWAGA: brak plikow ruchu dla chwytow {missing}, pomijam je "
+                      f"(nagraj tools/record_waypoints.py --name <nazwa>)")
+                cfg.grasps = [g for g in cfg.grasps if g.name not in missing]
+            if not cfg.grasps:
+                raise RuntimeError("zaden skonfigurowany chwyt nie ma pliku ruchu w motions/")
         self.controller = Controller(cfg)
         self.on_frame = on_frame
         self.verbose = verbose
@@ -272,6 +282,7 @@ class Brain:
                 lost_for = now - self._last_seen
                 if lost_for > c.lost_timeout_s:
                     self.base.stop()
+                    self._retry_count = 0  # nowa szyszka = nowa pula prob
                     self._goto(State.SEARCH, "zgubilem szyszke")
                 elif lost_for <= c.lost_hold_s:
                     # migotanie: dokoncz ostatni obrot przez chwile, bez jazdy do przodu na slepo
@@ -349,6 +360,9 @@ class Brain:
                 self._goto(State.SEARCH, "porzucam te szyszke")
             else:
                 self._timed_drive(c.retry_back_v, 0.0, c.retry_back_s)
+                # przez caly chwyt kamera nie widziala szyszki (ramie w kadrze); bez tego lost_timeout
+                # wyrzucilby nas do SEARCH w pierwszej klatce APPROACH
+                self._last_seen = self.clock.now()
                 self._goto(State.APPROACH, f"ponowna proba {self._retry_count}")
 
         if self._log is not None:

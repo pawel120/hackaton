@@ -281,7 +281,9 @@ class WaypointArm:
 
     def _send(self, pose: dict) -> None:
         self.arm.send_action({f"{j}.pos": float(v) for j, v in pose.items()})
-        self._last_cmd = dict(pose)
+        # scal z poprzednia komenda: po samym otwarciu chwytaka ({"gripper": 100}) reszta
+        # przegubow musi zostac znana, inaczej przy nieudanym odczycie _move rusza tylko chwytakiem
+        self._last_cmd = {**(self._last_cmd or {}), **{j: float(v) for j, v in pose.items()}}
 
     def _current_pose(self) -> dict:
         pose = self._read_pose()
@@ -344,12 +346,18 @@ class WaypointArm:
             reading = pose["gripper"]
             if reading < self.cfg.arm.empty_gripper_below:
                 # PROGRESS.md: odczyt ~2 po zamknieciu = chwytak pusty
-                log.info("chwytak PUSTY (odczyt %.1f < %.1f) - przerywam, otwieram", reading, self.cfg.arm.empty_gripper_below)
+                log.info("chwytak PUSTY (odczyt %.1f < %.1f) - przerywam, otwieram, wracam do home",
+                         reading, self.cfg.arm.empty_gripper_below)
                 self._move({"gripper": GRIPPER_OPEN}, 0.8)
+                # ramie nie moze zostac wyciagniete przy ziemi: zaslania kamere i szoruje przy cofaniu
+                self.home()
                 return False
             log.info("chwytak trzyma (odczyt %.1f)", reading)
             result = True
         return result
+
+    def has_motion(self, name: str) -> bool:
+        return os.path.exists(motion_path(self.cfg.arm.motions_dir, name))
 
     def home(self) -> None:
         if os.path.exists(motion_path(self.cfg.arm.motions_dir, "home")):

@@ -58,6 +58,7 @@ def ask_yes(prompt: str, default: bool = False) -> bool:
 def record_loop(arm_ctl, read_pose) -> list:
     """Petla interaktywna. arm_ctl = WaypointArm (do home), read_pose() -> dict."""
     waypoints: list = []
+    squeeze_target = None  # cel chwytaka od kroku check_gripper do konca ruchu
     print("\nUstaw ramie reka i nacisnij Enter, zeby dodac waypoint. 'q' + Enter konczy,")
     print("'d' + Enter usuwa ostatni, 'p' + Enter wypisuje biezaca pozycje.\n")
     while True:
@@ -84,6 +85,12 @@ def record_loop(arm_ctl, read_pose) -> list:
             # Cel ponizej empty_gripper_below sprawia, ze serwo sciska, a odczyt
             # ponizej progu oznacza pusty chwytak (PROGRESS.md: ~2 = pusto).
             pose["gripper"] = ask_float("cel gripper dla zacisku (0 = pelne zamkniecie)", 0.0)
+            squeeze_target = pose["gripper"]
+        elif squeeze_target is not None:
+            # po zacisku kolejne punkty (podniesienie, powrot) trzymaja ten sam cel chwytaka;
+            # wartosc z reki jest szersza niz szyszka i chwytak by sie rozluznil
+            if ask_yes(f"trzymac zacisk (gripper={squeeze_target:g}) w tym punkcie?", True):
+                pose["gripper"] = squeeze_target
         waypoints.append(Waypoint(label=label, pose=pose, seconds=seconds, check_gripper=check))
         print(f"  dodano '{label}' ({seconds:.1f} s{', check_gripper' if check else ''})")
 
