@@ -12,6 +12,14 @@ porazek znaleziona i naprawiona (patrz wpis sesji na dole) - **teza
 "ID serw sa zamienione" z poprzedniej sesji byla BLEDNA.**
 
 **Najwazniejsze na start nastepnej sesji (w tej kolejnosci):**
+0. **Nowy stos `pinecone_bot` (PR #14, poprawki z issue #15)** - zamiast
+   IK i slepego podjazdu: nagrany chwyt + baza ustawia szyszke z obrazu.
+   Kolejnosc na Pi jest w `PINECONE_README.md` ("Na Raspberry Pi, w tej
+   kolejnosci"): przestawic kamere wyzej i za ramie, `tools/snap_frames.py`,
+   `tools/calibrate_hsv.py`, `tools/record_waypoints.py` (grasp_near/far,
+   drop_box; grasp_mid jest z demo2_fixed.csv), `tools/calibrate_target.py`,
+   `tools/base_test.py` (znak skretu, mapowanie PWM), `--dry-run`, `--real`.
+   Punkty 2-4 ponizej dotycza starego podejscia i sa opcjonalne.
 1. `./arm.sh home` - `HOME_POSE` przepisany pod nowa kalibracje (ramie
    zlozone, bark -85 st, lokiec 99 st).
 2. **Chwyt z kamera jeszcze NIE trafil** (5 prob, patrz wpis "Chwyt z
@@ -196,6 +204,16 @@ Pytania do uzytkownika na starcie nastepnej sesji (nie zgaduj):
 - `render_map_preview.py` - podglad chmury `.ply` z RTAB-Map bez open3d:
   poziomuje mape do podlogi (RANSAC), widok z gory kolorowany wysokoscia
   + widok z ukosa.
+- `pinecone_bot/` + `tools/` + `motions/` + `tests/` - nowy, deterministyczny
+  stos zbierania szyszek (PR #14): "glupie ramie, madra baza". Ramie tylko
+  odtwarza nagrane ruchy z punktow (`motions/*.json`), baza ustawia szyszke w
+  miejscu nagranego chwytu z samego obrazu kolorowego (regulator P na
+  kolumnie/wierszu), maszyna stanow SEARCH/APPROACH/ALIGN/GRASP/DROP/RETRY,
+  szukanie pasami jak kosiarka. Bez IK, bez ML, bez LLM. Symulator na laptopie
+  (`python -m pinecone_bot.main --sim --show`), 60+ testow (`python -m pytest
+  tests -q`). **Poradnik krok po kroku na Pi: `PINECONE_README.md`.**
+  Config: `pinecone_config.json` (wypelniaja go narzedzia z `tools/`).
+  Wdrozenie: `deploy/push_to_pi.sh`.
 - `constraints.txt` - pin `numpy==2.5.3` dla pip; `lerobot` na Python
   3.14 probuje przebudowac numpy ze zrodla i pada (brak wheela + za
   stary GCC w systemie) - instalowac z `--no-deps` i doinstalowywac
@@ -730,3 +748,39 @@ cala petle) i sprawdzic, czy nagranie nie gubi klatek (zapis na SSD).
 Pipeline jest gotowy: `python bag_to_rtabmap.py NOWE.db3`, potem
 `run_rtabmap.cmd` z poprawionymi sciezkami w `rtabmap_source.ini`.
 
+## 2026-09-26 - pinecone_bot: deterministyczny stos (PR #14) + poprawki z issue #15
+
+Sesja Claude na laptopie (Windows, bez sprzetu). Nowy stos w `pinecone_bot/`,
+opis i poradnik w `PINECONE_README.md`, wpis w "Struktura repo" wyzej.
+
+**Zalozenie:** poprzednie podejscie (IK z niezmierzona transformacja
+kamera-ramie, slepy podjazd z czasu) chybialo systematycznie. Zamiast
+poprawiac teorie: ramie odtwarza nagrany chwyt w stalym miejscu, a baza
+ustawia szyszke w tym miejscu z obrazu (obrot az szyszka w kolumnie
+`cfg.cx`, jazda az w wierszu `target_row`). Wymaga przestawienia kamery
+tak, by widziala miejsce chwytu (dzis 17 cm przed kamera = martwa strefa).
+
+**Zrobione (bez sprzetu):**
+- Symulator (kamera pinhole + naped roznicowy) i pelna petla sterowania;
+  na 10 losowych ukladach 5 szyszek: pole 2.2 m -> 48/50, pole 3.0 m -> 44/50
+  (braki w rogach, pasy liczone z czasu bez odometrii).
+- Bledy sterowania zlapane w symulacji i naprawione: skrawek szyszki na
+  krawedzi obrazu wciagal w petle SEARCH/APPROACH (teraz detekcja
+  "czesciowa", uzywana tylko do kierunku); przestrzal po utracie celu
+  (obrot trzymany 0.25 s, potem pelzanie do przodu); przelaczanie celu
+  miedzy dwiema szyszkami w tej samej odleglosci (sledzenie celu).
+- Sterowniki bazy: Xiao (`a<speed> b<steer>`) i bipropellant po UART
+  (SPEED_DATA 0x03, hall 0x02 -> odometria). Ramie: punkty nad
+  `arm_control.py` + fallback na skrypt zespolu.
+- Poprawki z review PR #14 (issue #15): brakujace ruchy near/far pomijane
+  zamiast FileNotFoundError (config ma tylko grasp_mid, dopoki nie nagrane);
+  po pustym chwycie ramie wraca do home; `_last_cmd` scalany; reset licznika
+  prob po zgubieniu szyszki; `_last_seen` odswiezany po chwycie; blokada
+  zapisu na porcie w BipropellantBase; zacisk trzymany do konca nagrania;
+  deploy: `--delete`, wlasciwe requirements; polskie teksty w `frontend.html`
+  przywrocone (reszta repo zostaje ASCII).
+
+**Do zweryfikowania na sprzecie (rano):** znak skretu Xiao i mapowanie
+PWM -> m/s, prog "pusty chwytak" (`empty_gripper_below`, grasp_mid schodzi
+do ~0.5 przy pustym), kolejnosc kol i znak halla w bipropellancie, wersja
+protokolu (COBS czy stare ramki) - test `unlockASCII` po UART.

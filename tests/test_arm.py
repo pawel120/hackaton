@@ -217,12 +217,32 @@ def test_waypoint_replay_empty_returns_false_and_opens():
     close_pose = {f"{j}.pos": v for j, v in motion.waypoints[check].pose.items()}
     idx = next(i for i, a in enumerate(fake.actions) if a == pytest.approx(close_pose))
     after = fake.actions[idx + 1:]
-    # po zacisku: tylko otwieranie chwytaka, zadnego 'powrot do home z szyszka'
+    # po zacisku: otwarcie chwytaka, potem powrot do home (issue #15: ramie nie moze
+    # zostac wyciagniete przy ziemi, bo zaslania kamere i szoruje przy cofaniu)
     assert after, "chwytak powinien zostac otwarty"
-    assert all(set(a) == {"gripper.pos"} for a in after)
-    assert after[-1]["gripper.pos"] == pytest.approx(GRIPPER_OPEN)
+    gripper_only = [a for a in after if set(a) == {"gripper.pos"}]
+    assert gripper_only and gripper_only[-1]["gripper.pos"] == pytest.approx(GRIPPER_OPEN)
+    home_pose = {f"{j}.pos": v for j, v in load_motion(MOTIONS_DIR, "home").waypoints[-1].pose.items()}
+    assert full_actions(fake)[-1] == pytest.approx(home_pose), "po pustym chwycie ramie wraca do home"
     lift_pose = {f"{j}.pos": v for j, v in motion.waypoints[check + 1].pose.items()}
     assert not any(a == pytest.approx(lift_pose) for a in fake.actions)
+
+
+def test_waypoint_last_cmd_is_merged_not_replaced():
+    """issue #15: po komendzie samego chwytaka reszta przegubow musi zostac znana."""
+    fake = FakeArm()
+    ctl, _ = waypoint_arm(fake)
+    ctl._send({j: 10.0 for j in arm_mod.JOINT_NAMES})
+    ctl._send({"gripper": 100.0})
+    assert set(ctl._last_cmd) == set(arm_mod.JOINT_NAMES)
+    assert ctl._last_cmd["gripper"] == 100.0
+    assert ctl._last_cmd["shoulder_pan"] == 10.0
+
+
+def test_waypoint_has_motion():
+    ctl, _ = waypoint_arm(FakeArm())
+    assert ctl.has_motion("grasp_mid") and ctl.has_motion("home")
+    assert not ctl.has_motion("grasp_far_nie_nagrany")
 
 
 def test_waypoint_replay_without_check_returns_none():

@@ -340,6 +340,9 @@ class BipropellantBase:
         self._y = 0.0
         self._theta = 0.0
         self._stop_evt = threading.Event()
+        # osobna blokada na sam zapis do portu: stop()/close() z glownego watku i tick() z bip-io
+        # nie moga przeplatac bajtow ramek (ramka stop musi dojsc w calosci)
+        self._io_lock = threading.Lock()
         self._thread = threading.Thread(target=self._loop, name="bip-io", daemon=True)
         self._connect(connect_timeout_s)
         if autostart:
@@ -410,14 +413,16 @@ class BipropellantBase:
     def _send(self, som: int, data: bytes) -> None:
         frame = build_frame(som, self._next_ci(), data)
         try:
-            self._ser.write(frame)
+            with self._io_lock:
+                self._ser.write(frame)
             self.frames_sent += 1
         except Exception as exc:  # noqa: BLE001
             self.last_error = exc
 
     def _send_ack(self, ci: int) -> None:
         try:
-            self._ser.write(build_frame(BIP_SOM_NOACK, ci, bytes([BIP_CMD_ACK])))
+            with self._io_lock:
+                self._ser.write(build_frame(BIP_SOM_NOACK, ci, bytes([BIP_CMD_ACK])))
         except Exception as exc:  # noqa: BLE001
             self.last_error = exc
 

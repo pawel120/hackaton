@@ -4,19 +4,9 @@
   "cx": 320.0,
   "grasps": [
     {
-      "name": "grasp_near",
-      "target_row": 400.0,
-      "forward_m": 0.28
-    },
-    {
       "name": "grasp_mid",
       "target_row": 360.0,
       "forward_m": 0.33
-    },
-    {
-      "name": "grasp_far",
-      "target_row": 325.0,
-      "forward_m": 0.38
     }
   ],
   "detector": {
