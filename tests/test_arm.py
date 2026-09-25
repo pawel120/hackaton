@@ -130,18 +130,20 @@ def test_all_motion_files_load():
             fh.read().decode("ascii")  # regula zespolu: tylko ASCII
 
 
-def test_grasp_mid_matches_replay_demo():
+def test_grasp_mid_is_a_grasp():
+    # Tresc ruchu zmienia sie przy kazdym nagraniu, wiec tu tylko to, co musi
+    # zachodzic zawsze: start i koniec w HOME_POSE, dokladnie jeden punkt
+    # sprawdzenia chwytaka, a zacisk ponizej progu pustego chwytaka (inaczej
+    # pusty chwytak zostalby uznany za trzymajacy szyszke).
     motion = load_motion(MOTIONS_DIR, "grasp_mid")
-    labels = [wp.label for wp in motion.waypoints]
-    assert labels == [
-        "start (home)",
-        "wysiegniecie nad szyszka",
-        "max wysiegniecie / zacisk",
-        "powrot do home z szyszka",
-    ]
-    assert [wp.check_gripper for wp in motion.waypoints] == [False, False, True, False]
-    assert motion.waypoints[2].pose["elbow_flex"] == pytest.approx(-95.52)
-    assert motion.total_seconds == pytest.approx(6.0)
+    first, last = motion.waypoints[0].pose, motion.waypoints[-1].pose
+    for joint in ("shoulder_lift", "elbow_flex", "wrist_flex"):
+        assert first[joint] == pytest.approx(arm_mod.HOME_POSE[joint], abs=2.0), joint
+        assert last[joint] == pytest.approx(arm_mod.HOME_POSE[joint], abs=2.0), joint
+    checks = [wp for wp in motion.waypoints if wp.check_gripper]
+    assert len(checks) == 1
+    assert checks[0].pose["gripper"] < make_cfg().arm.empty_gripper_below
+    assert checks[0] is not motion.waypoints[-1]  # po zacisku jest jeszcze podniesienie
 
 
 def test_home_motion_is_home_pose():
@@ -197,10 +199,11 @@ def test_waypoint_replay_holds_returns_true():
     # ostatnia komenda = ostatni waypoint (ruch dokonczony)
     last = motion.waypoints[-1].pose
     assert sent[-1] == pytest.approx({f"{j}.pos": v for j, v in last.items()})
-    # interpolacja: ~30 komend/s przez 1.5 s na waypoint, 4 waypointy
-    assert len(sent) == 4 * 45
+    # interpolacja: rate_hz komend/s przez `seconds` kazdego waypointu
+    assert len(sent) == sum(max(1, round(wp.seconds * ctl.rate_hz)) for wp in motion.waypoints)
     # zegar: czasy ruchu + settle po kazdym waypointcie
-    assert clock.slept == pytest.approx(motion.total_seconds + 4 * ctl.settle_s, abs=0.05)
+    n = len(motion.waypoints)
+    assert clock.slept == pytest.approx(motion.total_seconds + n * ctl.settle_s, abs=0.05)
 
 
 def test_waypoint_replay_empty_returns_false_and_opens():
@@ -210,14 +213,15 @@ def test_waypoint_replay_empty_returns_false_and_opens():
 
     assert ctl.replay("grasp_mid") is False
 
-    close_pose = {f"{j}.pos": v for j, v in motion.waypoints[2].pose.items()}
+    check = next(i for i, wp in enumerate(motion.waypoints) if wp.check_gripper)
+    close_pose = {f"{j}.pos": v for j, v in motion.waypoints[check].pose.items()}
     idx = next(i for i, a in enumerate(fake.actions) if a == pytest.approx(close_pose))
     after = fake.actions[idx + 1:]
     # po zacisku: tylko otwieranie chwytaka, zadnego 'powrot do home z szyszka'
     assert after, "chwytak powinien zostac otwarty"
     assert all(set(a) == {"gripper.pos"} for a in after)
     assert after[-1]["gripper.pos"] == pytest.approx(GRIPPER_OPEN)
-    lift_pose = {f"{j}.pos": v for j, v in motion.waypoints[3].pose.items()}
+    lift_pose = {f"{j}.pos": v for j, v in motion.waypoints[check + 1].pose.items()}
     assert not any(a == pytest.approx(lift_pose) for a in fake.actions)
 
 
@@ -299,7 +303,7 @@ def test_sim_arm_returns_world_result(result):
     sim = SimArm(make_cfg("sim"), world=world, sleep=clock.sleep)
     assert sim.replay("grasp_mid") is result
     assert world.calls == ["grasp_mid"]
-    assert clock.slept == pytest.approx(6.0)  # suma seconds z grasp_mid.json
+    assert clock.slept == pytest.approx(load_motion(MOTIONS_DIR, "grasp_mid").total_seconds)
 
 
 def test_sim_arm_without_world_returns_none():
@@ -307,7 +311,8 @@ def test_sim_arm_without_world_returns_none():
     sim = SimArm(make_cfg("sim"), sleep=clock.sleep)
     assert sim.replay("grasp_mid") is None
     sim.home()
-    assert clock.slept == pytest.approx(6.0 + 2.0)
+    expected = load_motion(MOTIONS_DIR, "grasp_mid").total_seconds + load_motion(MOTIONS_DIR, "home").total_seconds
+    assert clock.slept == pytest.approx(expected)
 
 
 def test_subprocess_arm_formats_command():

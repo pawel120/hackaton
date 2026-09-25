@@ -1,26 +1,61 @@
 {
   "name": "grasp_mid",
-  "note": "przeniesione z replay_demo.py; nagrane PRZED naprawa barku (fix_shoulder_offset.py 2026-09-25), do ponownego nagrania na sprzecie: tools/record_waypoints.py --name grasp_mid. UWAGA: cel gripper=12 w kroku zacisku jest POWYZEJ empty_gripper_below (6), wiec pusty chwytak tez odczyta ~12 i check_gripper nie wykryje braku szyszki; przy nagrywaniu ustaw cel zacisku na 0 (record_waypoints proponuje to domyslnie).",
+  "note": "Kluczowe klatki z demo2_fixed.csv (reczne demo 2026-09-25, kalibracja po fix_shoulder_offset.py). Chwyt 17 cm przed kamera przy pan -13.6 (szyszka ok. 6 cm w lewo od osi). Od zacisku gripper=0: pusty chwytak czyta ~2 (< empty_gripper_below 6). Nie sprawdzone jeszcze w pinecone_bot na sprzecie (interpolacja miedzy punktami zamiast gestej trajektorii).",
   "waypoints": [
     {
       "label": "start (home)",
-      "pose": {"shoulder_pan": -0.13, "shoulder_lift": 96.75, "elbow_flex": 152.31, "wrist_flex": -101.41, "wrist_roll": 89.27, "gripper": 1.11},
+      "pose": {"shoulder_pan": 1.27, "shoulder_lift": -85.05, "elbow_flex": 100.0, "wrist_flex": -102.11, "wrist_roll": 89.1, "gripper": 1.69},
+      "seconds": 2.0
+    },
+    {
+      "label": "podniesienie ramienia",
+      "pose": {"shoulder_pan": 1.54, "shoulder_lift": -11.56, "elbow_flex": -6.9, "wrist_flex": -102.2, "wrist_roll": 89.1, "gripper": 1.69},
       "seconds": 1.5
     },
     {
-      "label": "wysiegniecie nad szyszka",
-      "pose": {"shoulder_pan": -8.22, "shoulder_lift": 34.95, "elbow_flex": -62.11, "wrist_flex": -13.05, "wrist_roll": 89.45, "gripper": 30.0},
-      "seconds": 1.5
+      "label": "wysiegniecie",
+      "pose": {"shoulder_pan": -0.31, "shoulder_lift": 28.26, "elbow_flex": -7.87, "wrist_flex": 46.81, "wrist_roll": 89.54, "gripper": 1.69},
+      "seconds": 1.0
     },
     {
-      "label": "max wysiegniecie / zacisk",
-      "pose": {"shoulder_pan": -6.2, "shoulder_lift": -5.49, "elbow_flex": -95.52, "wrist_flex": 12.79, "wrist_roll": 89.71, "gripper": 12.0},
-      "seconds": 1.5,
+      "label": "nad szyszka",
+      "pose": {"shoulder_pan": -18.33, "shoulder_lift": 71.78, "elbow_flex": 0.66, "wrist_flex": 54.11, "wrist_roll": 89.27, "gripper": 1.69},
+      "seconds": 1.0
+    },
+    {
+      "label": "otwarty nad szyszka",
+      "pose": {"shoulder_pan": -13.67, "shoulder_lift": 86.55, "elbow_flex": -3.82, "wrist_flex": 53.49, "wrist_roll": 89.63, "gripper": 45.7},
+      "seconds": 1.8
+    },
+    {
+      "label": "zacisk",
+      "pose": {"shoulder_pan": -12.18, "shoulder_lift": 85.85, "elbow_flex": -19.03, "wrist_flex": 53.05, "wrist_roll": 89.54, "gripper": 0.0},
+      "seconds": 1.0,
       "check_gripper": true
     },
     {
-      "label": "powrot do home z szyszka",
-      "pose": {"shoulder_pan": -0.13, "shoulder_lift": 96.75, "elbow_flex": 152.31, "wrist_flex": -101.41, "wrist_roll": 89.27, "gripper": 15.0},
+      "label": "podniesienie z szyszka",
+      "pose": {"shoulder_pan": -9.36, "shoulder_lift": 56.75, "elbow_flex": -98.07, "wrist_flex": 50.33, "wrist_roll": 89.54, "gripper": 0.0},
+      "seconds": 0.8
+    },
+    {
+      "label": "cofniecie",
+      "pose": {"shoulder_pan": -7.34, "shoulder_lift": 45.23, "elbow_flex": -97.71, "wrist_flex": -15.78, "wrist_roll": 89.19, "gripper": 0.0},
+      "seconds": 1.5
+    },
+    {
+      "label": "przenoszenie",
+      "pose": {"shoulder_pan": 1.71, "shoulder_lift": 36.26, "elbow_flex": -97.98, "wrist_flex": -16.31, "wrist_roll": 89.63, "gripper": 0.0},
+      "seconds": 1.0
+    },
+    {
+      "label": "skladanie",
+      "pose": {"shoulder_pan": 6.11, "shoulder_lift": -32.84, "elbow_flex": -68.7, "wrist_flex": 74.68, "wrist_roll": 89.27, "gripper": 0.0},
+      "seconds": 1.0
+    },
+    {
+      "label": "powrot do home",
+      "pose": {"shoulder_pan": 6.2, "shoulder_lift": -84.7, "elbow_flex": 99.56, "wrist_flex": -102.55, "wrist_roll": 89.27, "gripper": 0.0},
       "seconds": 1.5
     }
   ]
