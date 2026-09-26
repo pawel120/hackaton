@@ -9,6 +9,9 @@ Piec osob, jeden robot, hackaton. Ten plik czyta kazda sesja Claude Code; ludzie
    Praca idzie na branchu `<nick>/<opis>`, nigdy bezposrednio na `master`.
 2. Zanim dotkniesz sprzetu albo kodu sterowania, przeczytaj `docs/HARDWARE.md` (pulapki) i `docs/RUNBOOK.md` (kolejnosc narzedzi).
 3. Szczegoly zasad pracy: `docs/CONTRIBUTING.md`. Historia prob: `docs/LOG.md`.
+4. Sesja robi JEDNA rzecz z "Nastepne 3 kroki" w STATUS.md. Jesli uzytkownik nie powiedzial ktora,
+   zapytaj o to w pierwszej odpowiedzi i nie zaczynaj eksploracji repo. Zasady taniej pracy:
+   `docs/WORKFLOW_CLAUDE.md`. Subagenty tylko wedlug `AGENTS.md` (jawny model, test jako odbior).
 
 ## Zasady kodu
 

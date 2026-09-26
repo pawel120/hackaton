@@ -64,4 +64,5 @@ nieliniowe kola, port szeregowy).
 - [docs/SETUP.md](docs/SETUP.md): instalacja laptop / Pi.
 - [docs/HARDWARE.md](docs/HARDWARE.md): sprzet i pulapki.
 - [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md): jak pracujemy.
+- [docs/WORKFLOW_CLAUDE.md](docs/WORKFLOW_CLAUDE.md) i [AGENTS.md](AGENTS.md): jak pracowac z Claude tanio, kiedy wlaczac agentow.
 - Issues: [#7 mapa ogrodu](https://github.com/pawel120/hackaton/issues/7), [#8 zasilanie 12 V](https://github.com/pawel120/hackaton/issues/8).
