@@ -18,14 +18,14 @@
       ],
       "hi": [
         179,
-        130,
-        95
+        160,
+        255
       ]
     },
-    "min_area_px": 300,
+    "min_area_px": 400,
     "max_area_px": 40000,
     "blur_ksize": 5,
-    "morph_ksize": 7,
+    "morph_ksize": 9,
     "border_px": 3,
     "grasp_zone_rows": 40.0
   },
