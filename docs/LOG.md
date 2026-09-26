@@ -562,3 +562,9 @@ Pytania do uzytkownika na starcie nastepnej sesji (nie zgaduj):
 **Nie dziala / otwarte:** SSH po WiFi zawieszalo sie (kex zrywany) po kilku ubitych sesjach, pomogl restart Pi. Blad `Couldn't resolve requests` = kamera zajeta przez stary proces, nie brak trybu (424x240@30 wspierane, USB3). `lsusb` mowi D435, docs D415.
 **Nastepny krok:** przestawic kamere wyzej (STATUS krok 1); jesli glebia dalej slaba, sprobowac `--depth-res 480x270`.
 **Sprzet:** dotkniety (kamera, restart Pi)
+
+## 2026-09-26 - pawel120 (Claude) - webowy panel recznego sterowania ramieniem
+**Zrobione:** `tools/arm_web.py` (HTTP na :8010, bez websocketow) + `arm_panel.html`: "-"/"+" dla kazdego stawu o krok 1/5/10, pozycje z serw (odczyt max 2 Hz, tylko gdy ramie stoi), HOME, otworz/zamknij chwytak, lista ruchow z `motions/`, STOP (tez spacja). Logika w `pinecone_bot/arm_panel.py`: kolejka (jedna komenda naraz, max 10 oczekujacych), zakres z kalibracji serw (`arm.calibration` + tryb normalizacji, jak lerobot), max_relative_target=None + wlasny krok 2 st/tick (chwytak 4) przy 25 Hz, jog liczony od ostatniej wyslanej komendy (bez sync_read). HOME i ruchy przez `WaypointArm`, STOP przerywa je miedzy tickami. Po starcie serwer sam jedzie do HOME, do tego czasu przyjmuje tylko HOME/STOP. `--fake` = atrapa ramienia na laptopie. Testy: `tests/test_arm_panel.py` (19).
+**Nie dziala / otwarte:** nie uruchomione na prawdziwym ramieniu. `arm_control.open_gripper/go_home` nie uzyte wprost: `move_to` robi sync_read przy kazdym wywolaniu i skacze bez limitu kroku (pulapka 10); zamiast tego te same wartosci (0/100, `motions/home.json`) przez limit kroku. Ctrl+C = disconnect = torque off, ramie opada - najpierw HOME.
+**Nastepny krok:** na Pi `python tools/arm_web.py`, czlowiek przy ramieniu; sprawdzic HOME przy starcie, jog 1 st, STOP w trakcie `grasp_mid`.
+**Sprzet:** nie

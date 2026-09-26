@@ -1,0 +1,159 @@
+"""Panel webowy do recznego sterowania ramieniem SO-101 (arm_panel.html).
+
+Uzycie (na Pi, z katalogu repo):
+    python tools/arm_web.py                       # port ramienia z ROBOT_ARM_PORT albo cfg.arm.port
+    python tools/arm_web.py --port /dev/robot-arm
+    python tools/arm_web.py --fake                # atrapa ramienia, bez lerobot (laptop)
+
+Potem w przegladarce: http://<IP_PI>:8010
+
+Po starcie ramie NAJPIERW jedzie do HOME; do tego czasu panel przyjmuje tylko
+HOME i STOP. Jedna komenda naraz (kolejka w pinecone_bot/arm_panel.py),
+zakres z kalibracji serw, max_relative_target=None + wlasny limit kroku,
+odczyt pozycji max 2 Hz i tylko gdy ramie stoi (docs/HARDWARE.md, pulapka 10).
+
+Ctrl+C rozlacza ramie i lerobot WYLACZA torque - ramie opadnie. Najpierw HOME.
+
+Porty: 8000/8765 = web_control.py (jazda), 8001 = STOP bazy, 8010 = ten panel.
+Nie uruchamia `lerobot calibrate` i nie zapisuje kalibracji (connect(calibrate=False)).
+"""
+from __future__ import annotations
+
+import argparse
+import http.server
+import json
+import logging
+import os
+import sys
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
+from pinecone_bot.arm_panel import (  # noqa: E402
+    FAKE_CALIBRATION,
+    FAKE_NORM_MODES,
+    ArmPanel,
+    FakeSO101,
+    limits_from_calibration,
+)
+from pinecone_bot.config import Config  # noqa: E402
+
+PAGE = os.path.join(REPO_ROOT, "arm_panel.html")
+HTTP_PORT = 8010
+MAX_BODY = 4096
+
+log = logging.getLogger("arm_web")
+
+
+def connect_real_arm(port: str, arm_id: str):
+    """Laczy ramie przez arm_control (lerobot importowany dopiero tutaj). Zwraca (arm, limits)."""
+    import arm_control  # lazy: ciagnie lerobot
+
+    arm = arm_control.make_arm(port=port, arm_id=arm_id, max_relative_target=None)
+    if not arm.calibration:
+        raise SystemExit(
+            f"brak pliku kalibracji {arm.calibration_fpath} - skopiuj go (NIE uruchamiaj lerobot calibrate)"
+        )
+    modes = {name: motor.norm_mode.name for name, motor in arm.bus.motors.items()}
+    limits = limits_from_calibration(arm.calibration, modes)
+    arm.connect(calibrate=False)
+    return arm, limits
+
+
+def make_handler(panel: ArmPanel):
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, fmt, *args):  # bez linii w konsoli co 0.5 s od odpytywania stanu
+            pass
+
+        def _send(self, code: int, body: bytes, ctype: str) -> None:
+            self.send_response(code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _json(self, code: int, payload: dict) -> None:
+            self._send(code, json.dumps(payload).encode("ascii"), "application/json")
+
+        def do_GET(self):
+            if self.path in ("/", "/index.html", "/arm_panel.html"):
+                with open(PAGE, "rb") as fh:
+                    self._send(200, fh.read(), "text/html; charset=utf-8")
+            elif self.path == "/api/state":
+                self._json(200, panel.snapshot())
+            else:
+                self._json(404, {"ok": False, "msg": "nie ma"})
+
+        def do_POST(self):
+            if self.path != "/api/cmd":
+                self._json(404, {"ok": False, "msg": "nie ma"})
+                return
+            length = int(self.headers.get("Content-Length") or 0)
+            if length <= 0 or length > MAX_BODY:
+                self._json(400, {"ok": False, "msg": "zla dlugosc"})
+                return
+            try:
+                data = json.loads(self.rfile.read(length))
+            except ValueError:
+                self._json(400, {"ok": False, "msg": "zly JSON"})
+                return
+            if not isinstance(data, dict):
+                self._json(400, {"ok": False, "msg": "zly JSON"})
+                return
+            ok, msg = panel.submit(data)
+            if ok:
+                log.info("komenda %s", data)
+            self._json(200 if ok else 409, {"ok": ok, "msg": msg})
+
+    return Handler
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--port", default=None, help="port ramienia (domyslnie ROBOT_ARM_PORT albo cfg.arm.port)")
+    parser.add_argument("--id", default=None, help="domyslnie cfg.arm.arm_id")
+    parser.add_argument("--host", default=os.environ.get("ROBOT_HOST", "0.0.0.0"))
+    parser.add_argument("--http-port", type=int, default=HTTP_PORT)
+    parser.add_argument("--fake", action="store_true", help="atrapa ramienia (bez lerobot i sprzetu)")
+    args = parser.parse_args()
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+    cfg = Config.load()
+    port = args.port or os.environ.get("ROBOT_ARM_PORT") or cfg.arm.port
+    arm_id = args.id or cfg.arm.arm_id
+
+    if args.fake:
+        arm = FakeSO101()
+        limits = limits_from_calibration(FAKE_CALIBRATION, FAKE_NORM_MODES)
+        print("ATRAPA ramienia (--fake), sprzet nie jest uzywany")
+    else:
+        print(f"lacze ramie: port {port}, id {arm_id}")
+        arm, limits = connect_real_arm(port, arm_id)
+    for joint, (lo, hi) in limits.items():
+        print(f"  zakres {joint:14s} {lo:8.1f} .. {hi:8.1f}")
+
+    panel = ArmPanel(arm, cfg, limits)
+    panel.start(home_first=True)
+    print("ramie jedzie do HOME...")
+
+    httpd = http.server.ThreadingHTTPServer((args.host, args.http_port), make_handler(panel))
+    print(f"panel: http://<IP>:{args.http_port} (nasluch {args.host})")
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("koniec")
+    finally:
+        httpd.server_close()
+        panel.shutdown()
+        try:
+            arm.disconnect()
+        except Exception as exc:  # noqa: BLE001
+            print(f"(disconnect nieudany, pewnie juz rozlaczone: {exc})")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
