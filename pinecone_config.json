@@ -63,10 +63,10 @@
     "port": "/dev/robot-drive",
     "baud": 115200,
     "wheel_base_m": 0.5,
-    "xiao_pwm_min": 80,
-    "xiao_pwm_max": 260,
+    "xiao_pwm_min": 70,
+    "xiao_pwm_max": 100,
     "xiao_steer_min": 60,
-    "xiao_steer_max": 220,
+    "xiao_steer_max": 100,
     "xiao_period_s": 0.08,
     "bip_period_s": 0.05,
     "bip_hall_every": 4
