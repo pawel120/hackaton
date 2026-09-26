@@ -55,8 +55,9 @@ DEFAULT_PARAMS = {
     "fig8_steer": 0.025,     # figure-eight: steer fraction while arcing (keep well below fig8_speed!)
     "fig8_ramp": 0.02,       # figure-eight: per-tick ramp
     "fig8_loop_seconds": 10.0,  # figure-eight: seconds per half-loop before switching direction
-    # coverage ("lawnmower"): forward a lane, pivot ~90 deg twice (same direction) to
-    # shift into the next lane heading the opposite way, repeat -> sweeps the whole floor.
+    # coverage ("lawnmower", S-path): forward a lane, pivot ~90 deg twice (same direction) to
+    # shift into the next lane heading the opposite way, then the next U-turn goes the other
+    # way (left, right, left...) -> sweeps the whole floor instead of shuttling between 2 lanes.
     "cov_speed": 0.06,        # forward speed fraction while driving a lane
     "cov_forward_seconds": 6.0,   # how long to drive straight per lane
     "cov_turn_steer": 0.4,    # steer fraction while pivoting (in-place turn, speed=0)
@@ -86,6 +87,17 @@ def step_toward(current, target, step):
     if current > target:
         return max(current - step, target)
     return current
+
+
+COV_NEXT_PHASE = {"forward": "turn1", "turn1": "lane", "lane": "turn2", "turn2": "forward"}
+
+
+def coverage_advance(phase, turn_dir):
+    """Next (phase, turn_dir) of the S-path. The U-turn side flips after every turn2, so
+    consecutive U-turns alternate left/right and the lanes step across the floor."""
+    if phase == "turn2":
+        turn_dir = -turn_dir
+    return COV_NEXT_PHASE[phase], turn_dir
 
 
 def load_recordings():
@@ -127,6 +139,7 @@ class RobotState:
         self.fig8_half_start = time()
         self.cov_phase = "forward"  # "forward" | "turn1" | "lane" | "turn2"
         self.cov_phase_start = time()
+        self.cov_turn_dir = 1  # +1 / -1: side of the current U-turn, flips after each one
         self.speed_scale = 1.0  # 0..1, multiplies both manual and figure8 speed targets
         self.params = dict(DEFAULT_PARAMS)
 
@@ -191,6 +204,7 @@ async def ws_handler(websocket):
                     if new_mode == "coverage" and state.mode != "coverage":
                         state.cov_phase = "forward"
                         state.cov_phase_start = time()
+                        state.cov_turn_dir = 1
                     state.playback_name = None
                     state.mode = new_mode
                     if new_mode == "manual":
@@ -291,9 +305,8 @@ async def control_loop():
                 "lane": p["cov_lane_seconds"],
                 "turn2": p["cov_turn_seconds"],
             }
-            next_phase = {"forward": "turn1", "turn1": "lane", "lane": "turn2", "turn2": "forward"}
             if time() - state.cov_phase_start >= phase_durations[state.cov_phase]:
-                state.cov_phase = next_phase[state.cov_phase]
+                state.cov_phase, state.cov_turn_dir = coverage_advance(state.cov_phase, state.cov_turn_dir)
                 state.cov_phase_start = time()
 
             if state.cov_phase in ("forward", "lane"):
@@ -301,7 +314,7 @@ async def control_loop():
                 steer_target = 0.0
             else:
                 speed_target = 0.0
-                steer_target = p["cov_turn_steer"] * state.speed_scale
+                steer_target = state.cov_turn_dir * p["cov_turn_steer"] * state.speed_scale
 
             state.speed = step_toward(state.speed, speed_target, p["accel_step"])
             state.steer = step_toward(state.steer, steer_target, p["accel_step"])

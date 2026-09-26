@@ -556,3 +556,14 @@ Pytania do uzytkownika na starcie nastepnej sesji (nie zgaduj):
   kamera+ramie)? Czy ma juz system/siec/zdalny dostep? Czy repo jest na
   nim sklonowane? Jak podsystemy maja sie komunikowac (jeden proces vs
   serwisy po sieci)?
+
+## 2026-09-26 - tomek - sciezka S w POKRYCIU
+**Zrobione:** tryb POKRYCIE w `web_control.py` zawsze skrecal w te sama strone, wiec po drugim nawrocie
+wracal na pierwszy pas i jezdzil tam i z powrotem po dwoch pasach. Teraz kierunek nawrotu zmienia sie po
+kazdym `turn2` (L, P, L...), wiec pasy ida w poprzek pola. Logika fazy wydzielona do `coverage_advance()`,
+test `tests/test_web_control_coverage.py` (websockets podstawiony stubem, bo nie ma go w CI).
+**Nie dziala / otwarte:** nie jechane na sprzecie. Czasy otwarte (bez odometrii), wiec 90 st zalezy od
+`cov_turn_seconds`. Znak skretu Xiao niezmierzony: pierwszy nawrot moze pojsc w prawo - wtedy start z drugiego rogu.
+**Nastepny krok:** na trawie nastroic `cov_turn_seconds` do 90 st, potem dlugosc pasa i odstep; zmierzone
+predkosci przepisac do `search_drive_v` / `search_w` w `pinecone_config.json`.
+**Sprzet:** nie
