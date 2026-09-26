@@ -305,9 +305,12 @@ function connect() {
 }
 connect();
 
-// Heartbeat: the server stops the robot if it hears nothing for HEARTBEAT_TIMEOUT (1.0 s).
+// Heartbeat: the server stops the robot if it hears nothing for HEARTBEAT_TIMEOUT (1.0 s)
+// and clears its keys. The heartbeat carries the key state, so a key still held after a
+// hotspot latency spike takes effect again instead of the robot staying stopped until
+// the key is pressed anew.
 setInterval(() => {
-  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'keys', ...keys }));
 }, 200);
 
 const keyMap = { KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd' };

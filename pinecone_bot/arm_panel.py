@@ -43,6 +43,9 @@ log = logging.getLogger(__name__)
 GRIPPER_CLOSED = 0.0          # arm_control.close_gripper: 0 = zamkniety
 STEP_CHOICES = (1.0, 5.0, 10.0)
 MAX_QUEUE = 10                # wiecej oczekujacych komend = klikanie na oslep, odrzucamy
+# Staw dalej niz tyle poza zakresem kalibracji = jog zablokowany. Serwo i tak utnie cel do
+# swojego limitu pozycji (EEPROM), wiec "ruch o 1 st" stalby sie skokiem do granicy zakresu.
+OUT_OF_RANGE_TOL = 1.0
 RAW_RESOLUTION = 4095         # STS3215: 4096 krokow, lerobot dzieli przez (4096 - 1)
 
 # Maksymalna zmiana celu na jeden tick (stopnie; gripper w jednostkach 0-100).
@@ -317,6 +320,13 @@ class ArmPanel:
         if cmd == "jog":
             joint, step = data["joint"], data["step"]
             start = self._setpoint()[joint]
+            lo, hi = self.limits[joint]
+            for label, val in (("komenda", start), ("odczyt", self.positions.get(joint))):
+                if val is not None and not (lo - OUT_OF_RANGE_TOL <= val <= hi + OUT_OF_RANGE_TOL):
+                    raise RuntimeError(
+                        f"{joint} poza zakresem kalibracji ({label} {val:.1f}, zakres {lo:.1f}..{hi:.1f}): "
+                        f"serwo skoczyloby do granicy o {min(abs(val - lo), abs(val - hi)):.0f} st - ustaw recznie"
+                    )
             target = jog_target(start, step, *self.limits[joint])
             self._step_to({joint: target})
             return f"{joint}: {start:.1f} -> {target:.1f}"
