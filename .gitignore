@@ -7,3 +7,5 @@ venv/
 cel.json
 *_snapshot.png
 runs/
+pinecone_log.csv
+frames/

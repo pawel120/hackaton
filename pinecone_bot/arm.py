@@ -8,7 +8,7 @@ zeby dalo sie go powtarzac i recznie poprawiac.
 Sterowniki (cfg.arm.driver):
     sim         - SimArm: tylko spi i pyta symulator (world.try_grasp) o wynik
     waypoints   - WaypointArm: prawdziwe ramie przez arm_control.make_arm (lerobot)
-    subprocess  - SubprocessArm: odpala zewnetrzny skrypt zespolu (replay_demo.py)
+    subprocess  - SubprocessArm: odpala zewnetrzny skrypt zespolu (legacy/arm_recordings/replay_demo.py)
 
 Interfejs (uzywany przez maszyne stanow):
     replay(name) -> True  (ruch wykonany, chwytak cos trzyma)

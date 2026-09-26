@@ -13,9 +13,9 @@ Uzycie (na Pi):
     python tools/record_waypoints.py --name drop_box --note "pojemnik po lewej"
 
 WAZNE: waypointy sa w stopniach lerobot, czyli wzgledem kalibracji serw.
-Po KAZDEJ zmianie kalibracji (lerobot calibrate, fix_shoulder_offset.py,
+Po KAZDEJ zmianie kalibracji (lerobot calibrate, legacy/arm_recordings/fix_shoulder_offset.py,
 zmiana Homing_Offset) ruch trzeba nagrac od nowa - przeliczanie starych
-nagran (jak demo2_fixed.csv) to zrodlo bledow.
+nagran (jak legacy/arm_recordings/demo2_fixed.csv) to zrodlo bledow.
 """
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ from pinecone_bot.config import Config  # noqa: E402
 
 CALIBRATION_REMINDER = (
     "PAMIETAJ: waypointy zaleza od kalibracji serw. Po kazdej zmianie kalibracji\n"
-    "(lerobot calibrate, fix_shoulder_offset.py, Homing_Offset) nagraj ruch od nowa."
+    "(lerobot calibrate, legacy/arm_recordings/fix_shoulder_offset.py, Homing_Offset) nagraj ruch od nowa."
 )
 
 

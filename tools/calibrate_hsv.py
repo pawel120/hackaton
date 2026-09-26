@@ -20,7 +20,7 @@ Klawisze:
 --sample: klikniecie na dowolnym z trzech paneli wypisuje HSV piksela oraz
 min/max z lat 5x5 wokol niego. Klikaj po szyszce i po murawie, patrz, ktory
 kanal je rozdziela (na tym torze o zmierzchu bylo to V, nie H - patrz
-sample_colors.py).
+legacy/vision/sample_colors.py).
 """
 from __future__ import annotations
 

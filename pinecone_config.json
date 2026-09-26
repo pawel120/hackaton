@@ -76,7 +76,7 @@
     "port": "/dev/robot-arm",
     "arm_id": "so101",
     "motions_dir": "motions",
-    "subprocess_cmd": "python replay_demo.py --port {port}",
+    "subprocess_cmd": "python legacy/arm_recordings/replay_demo.py --port {port}",
     "empty_gripper_below": 6.0
   },
   "sim": {

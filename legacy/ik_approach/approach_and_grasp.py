@@ -18,12 +18,12 @@ Czego tu NIE MA i o czym trzeba pamietac czytajac wypis:
   * maksymalne rozwarcie chwytaka jest zalozone, nie zmierzone.
 Kazde z tych trzech miejsc jest wypisywane jako ZALOZENIE przy kazdym planie.
 
-Uzycie:
-    python approach_and_grasp.py                        # plan z cel.json, nic nie wysyla
-    python approach_and_grasp.py --target cel.json --index 1
-    python approach_and_grasp.py --no-drive             # chwyt z celu bez dojazdu platformy
-    python approach_and_grasp.py --standoff 0.15        # gdzie ma stanac szyszka po dojazdzie
-    python approach_and_grasp.py --port COM10           # DOPIERO TO rusza ramieniem
+Uzycie (sciezki wzgledem katalogu glownego repo, skrypt jest w legacy/ik_approach/):
+    python legacy/ik_approach/approach_and_grasp.py                 # plan z cel.json, nic nie wysyla
+    python legacy/ik_approach/approach_and_grasp.py --target cel.json --index 1
+    python legacy/ik_approach/approach_and_grasp.py --no-drive      # chwyt z celu bez dojazdu platformy
+    python legacy/ik_approach/approach_and_grasp.py --standoff 0.15 # gdzie ma stanac szyszka po dojazdzie
+    python legacy/ik_approach/approach_and_grasp.py --port COM10    # DOPIERO TO rusza ramieniem
 """
 
 from __future__ import annotations
@@ -39,7 +39,8 @@ import numpy as np
 # ---------------------------------------------------------------- stale
 
 REPO_DIR = os.path.dirname(os.path.abspath(__file__))
-URDF_PATH = os.path.join(REPO_DIR, "so101_urdf", "so101_new_calib.urdf")
+REPO_ROOT = os.path.dirname(os.path.dirname(REPO_DIR))
+URDF_PATH = os.path.join(REPO_ROOT, "so101_urdf", "so101_new_calib.urdf")
 TRANSFORM_PATH = os.path.join(REPO_DIR, "arm_camera_transform.json")
 TARGET_PATH = os.path.join(REPO_DIR, "cel.json")
 
@@ -938,6 +939,7 @@ def print_plan(plan: dict, dry_run: bool) -> None:
 def execute_plan(plan: dict, port: str, arm_id: str, steps_per_move: int, settle_s: float) -> None:
     """Wyslanie planu na ramie. Wchodzi tu tylko przy jawnym --port."""
     try:
+        import os, sys; sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
         import arm_control
     except Exception as exc:  # lerobot ciagnie torcha, na laptopie moze go nie byc
         raise PlanError(

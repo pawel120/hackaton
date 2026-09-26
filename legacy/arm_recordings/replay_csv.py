@@ -4,9 +4,9 @@ W odroznieniu od replay_demo.py (kilka recznie wybranych punktow) tu idzie
 cala trajektoria z CSV (~10 klatek/s), wiec kazdy krok jest maly i serwo nie
 wybiera "drogi naokolo". Najpierw powolny dojazd do pierwszej klatki.
 
-Uzycie (na Pi):
-    python replay_csv.py demo2_fixed.csv --port /dev/robot-arm --start 4 --end 23
-    python replay_csv.py demo2_fixed.csv --dry-run
+Uzycie (na Pi, uruchamiac z katalogu glownego repo):
+    python legacy/arm_recordings/replay_csv.py legacy/arm_recordings/demo2_fixed.csv --port /dev/robot-arm --start 4 --end 23
+    python legacy/arm_recordings/replay_csv.py legacy/arm_recordings/demo2_fixed.csv --dry-run
 """
 
 from __future__ import annotations
@@ -14,6 +14,8 @@ from __future__ import annotations
 import argparse
 import csv
 import time
+
+import os, sys; sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 import arm_control as ac
 

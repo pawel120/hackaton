@@ -37,7 +37,7 @@ do przeklikania planu - na nich nie wolno jechac po cel.
 
     1. Wolna plaska przestrzen, min. 2 m przed platforma, wylacznik w rece.
     2. Tasma malarska na podlodze: znacznik startu przy jednym kole.
-       python drive_to_target.py --calibrate --port COM9
+       python legacy/ik_approach/drive_to_target.py --calibrate --port COM9
        Skrypt jedzie 3 s prosto (z rampami), staje, potem 3 s obrotu i staje.
     3. Po fazie jazdy zmierz miarka przebyta droge tego samego kola [m].
        Wpisz do drive_calibration.json: drive.meters_per_second = droga /
@@ -49,7 +49,7 @@ do przeklikania planu - na nich nie wolno jechac po cel.
        odczytu jest wtedy najmniejszy).
        turn.degrees_per_second = kat / (hold_seconds + ramp_seconds).
     5. Ustaw "measured": true w obu sekcjach i w polu na gorze pliku.
-    6. Kontrola: python drive_to_target.py --calibrate --calibration-seconds 2
+    6. Kontrola: python legacy/ik_approach/drive_to_target.py --calibrate --calibration-seconds 2
        powinno dac 2/3 drogi i 2/3 kata z punktu 3-4. Jesli nie, nawierzchnia
        slizga sie na starcie - podnies --ramp-seconds i powtorz.
     7. Kalibracja jest wazna dla JEDNEJ pary speed/steer i JEDNEJ nawierzchni.
@@ -60,13 +60,13 @@ i rampa w dol daja razem srednio jedna rampe jazdy z pelna predkoscia (trapez),
 wiec droga = predkosc * (hold_seconds + ramp_seconds). Ten sam model liczy czasy
 w druga strone, gdy planujemy dojazd.
 
-UZYCIE
-    python drive_to_target.py                          # plan z cel.json, zero serialu
-    python drive_to_target.py --standoff 0.15          # wiekszy zapas przed szyszka
-    python drive_to_target.py --target 1               # drugi cel z pliku
-    python drive_to_target.py --port COM9              # PRAWDZIWA jazda
-    python drive_to_target.py --port COM9 --dry-run    # port podany, ale nadal bez ruchu
-    python drive_to_target.py --calibrate --port COM9  # przejazd wzorcowy do miarki
+UZYCIE (skrypt jest w legacy/ik_approach/, uruchamiac z katalogu glownego repo)
+    python legacy/ik_approach/drive_to_target.py                          # plan z cel.json, zero serialu
+    python legacy/ik_approach/drive_to_target.py --standoff 0.15          # wiekszy zapas przed szyszka
+    python legacy/ik_approach/drive_to_target.py --target 1               # drugi cel z pliku
+    python legacy/ik_approach/drive_to_target.py --port COM9              # PRAWDZIWA jazda
+    python legacy/ik_approach/drive_to_target.py --port COM9 --dry-run    # port podany, ale nadal bez ruchu
+    python legacy/ik_approach/drive_to_target.py --calibrate --port COM9  # przejazd wzorcowy do miarki
 
 Bez --port skrypt NIGDY nie otwiera portu i nie rusza silnikow.
 """
@@ -122,7 +122,7 @@ DISTANCE_TOLERANCE_M = 0.01  # rozjazd ground_distance_m vs hypot(forward, later
 DEFAULT_CALIBRATION = {
     "_uwaga": (
         "WARTOSCI DOMYSLNE SA ZGADNIETE I NIEZMIERZONE. Zmierz je miarka "
-        "(python drive_to_target.py --calibrate --port COMx), wpisz tutaj i "
+        "(python legacy/ik_approach/drive_to_target.py --calibrate --port COMx), wpisz tutaj i "
         "ustaw measured na true. Do tego czasu dojazd jest tylko symulacja."
     ),
     "measured": False,

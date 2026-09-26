@@ -15,9 +15,9 @@ Prog na jasnosc jest z natury kruchy - slonce albo cien go przesuwa. Przy
 kazdej zmianie swiatla przepusc to jeszcze raz i podmien COLOR_GATE w
 detect_floor_objects.py.
 
-Uzycie:
-    python sample_colors.py
-    python sample_colors.py --frames 20 --laser-power 360
+Uzycie (uruchamiac z katalogu glownego repo):
+    python legacy/vision/sample_colors.py
+    python legacy/vision/sample_colors.py --frames 20 --laser-power 360
 """
 
 from __future__ import annotations
@@ -26,6 +26,8 @@ import argparse
 
 import cv2
 import numpy as np
+
+import os, sys; sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from detect_floor_objects import TARGET_PRESETS, FloorObjectDetector, start_pipeline
 

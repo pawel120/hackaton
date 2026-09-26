@@ -12,7 +12,7 @@ PRAWDZIWEJ predkosci zmierzonej wlasnie w tej sesji z poprzednich krokow
 (dystans/czas), nie z domyslnych/zgadnietych stalych.
 
 Kolejnosc: skan -> [korekta kierunku jesli trzeba] -> [krok naprzod -> skan] * N
-           -> jeden krok slepy do standoffu -> approach_and_grasp.py (chwyt)
+           -> jeden krok slepy do standoffu -> legacy/ik_approach/approach_and_grasp.py (chwyt)
 """
 
 from __future__ import annotations
@@ -71,7 +71,16 @@ def drive_step(port: str, speed: int, steer: int, duration: float, dry_run: bool
 
 
 def grasp(standoff: float, port: str, dry_run: bool) -> None:
-    cmd = [sys.executable, "approach_and_grasp.py", "--standoff", f"{standoff:.3f}", "--port", port]
+    cmd = [
+        sys.executable,
+        str(REPO_DIR / "legacy" / "ik_approach" / "approach_and_grasp.py"),
+        "--target",
+        str(CEL_JSON),
+        "--standoff",
+        f"{standoff:.3f}",
+        "--port",
+        port,
+    ]
     if dry_run:
         cmd.append("--dry-run")
     run(cmd)
