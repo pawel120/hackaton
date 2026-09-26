@@ -1,7 +1,11 @@
 """Podglad na zywo z RealSense D415 przez przegladarke (MJPEG po HTTP).
 
 Uzycie na Pi:
-    python rs_mjpeg_server.py [--port 8080]
+    python rs_mjpeg_server.py [--port 8080] [--depth-res 424x240] [--max-mm 1500]
+
+Glebia w nizszej rozdzielczosci ma mniejszy minimalny zasieg (MinZ w D4xx skaluje sie
+z rozdzielczoscia glebi), wiec bliskie obiekty przestaja byc dziura. Kolor zostaje 640x480,
+glebia jest wyrownywana do koloru przez rs.align.
 
 Potem w przegladarce na laptopie: http://<IP_PI>:8080/
 Zatrzymanie: Ctrl+C.
@@ -17,6 +21,8 @@ import numpy as np
 import pyrealsense2 as rs
 
 WIDTH, HEIGHT, FPS = 640, 480, 30
+DEPTH_WIDTH, DEPTH_HEIGHT = 424, 240
+MAX_MM = 1500  # odleglosc, przy ktorej kolormapa sie nasyca
 
 latest_jpg = None
 latest_lock = threading.Lock()
@@ -28,8 +34,11 @@ def capture_loop():
     pipeline = rs.pipeline()
     config = rs.config()
     config.enable_stream(rs.stream.color, WIDTH, HEIGHT, rs.format.bgr8, FPS)
-    config.enable_stream(rs.stream.depth, WIDTH, HEIGHT, rs.format.z16, FPS)
-    pipeline.start(config)
+    config.enable_stream(rs.stream.depth, DEPTH_WIDTH, DEPTH_HEIGHT, rs.format.z16, FPS)
+    profile = pipeline.start(config)
+    depth_scale = profile.get_device().first_depth_sensor().get_depth_scale()
+    alpha = 255.0 / (MAX_MM / 1000.0 / depth_scale)
+    print(f"RealSense: color {WIDTH}x{HEIGHT}, depth {DEPTH_WIDTH}x{DEPTH_HEIGHT}")
     align = rs.align(rs.stream.color)
     print("RealSense: stream started")
     try:
@@ -43,7 +52,7 @@ def capture_loop():
             color_image = np.asanyarray(color_frame.get_data())
             depth_image = np.asanyarray(depth_frame.get_data())
             depth_colormap = cv2.applyColorMap(
-                cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET
+                cv2.convertScaleAbs(depth_image, alpha=alpha), cv2.COLORMAP_JET
             )
             combined = np.hstack((color_image, depth_colormap))
             ok, buf = cv2.imencode(".jpg", combined, [cv2.IMWRITE_JPEG_QUALITY, 80])
@@ -100,9 +109,17 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    global DEPTH_WIDTH, DEPTH_HEIGHT, MAX_MM
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--depth-res", default=f"{DEPTH_WIDTH}x{DEPTH_HEIGHT}",
+                        help="rozdzielczosc glebi, np. 424x240, 480x270, 640x480")
+    parser.add_argument("--max-mm", type=int, default=MAX_MM,
+                        help="odleglosc [mm] dla czerwonego koloru kolormapy")
     args = parser.parse_args()
+
+    DEPTH_WIDTH, DEPTH_HEIGHT = (int(v) for v in args.depth_res.lower().split("x"))
+    MAX_MM = args.max_mm
 
     t = threading.Thread(target=capture_loop, daemon=True)
     t.start()
