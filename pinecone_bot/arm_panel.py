@@ -76,6 +76,7 @@ MAX_QUEUE = 10                # wiecej oczekujacych komend = klikanie na oslep, 
 # Staw dalej niz tyle poza zakresem kalibracji = jog zablokowany. Serwo i tak utnie cel do
 # swojego limitu pozycji (EEPROM), wiec "ruch o 1 st" stalby sie skokiem do granicy zakresu.
 OUT_OF_RANGE_TOL = 1.0
+RECOVER_TOL = 10.0            # do tylu st za granica jog w strone zakresu jest dozwolony
 MAX_DRAFT = 40                # waypointow w szkicu ruchu nagrywanego z panelu
 MOTION_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
 RAW_RESOLUTION = 4095         # STS3215: 4096 krokow, lerobot dzieli przez (4096 - 1)
@@ -493,10 +494,16 @@ class ArmPanel:
             start = self._setpoint()[joint]
             lo, hi = self.limits[joint]
             for label, val in (("komenda", start), ("odczyt", self.positions.get(joint))):
-                if val is not None and not (lo - OUT_OF_RANGE_TOL <= val <= hi + OUT_OF_RANGE_TOL):
+                if val is None or lo - OUT_OF_RANGE_TOL <= val <= hi + OUT_OF_RANGE_TOL:
+                    continue
+                # Lekko za granica (np. wrist_roll z kamera ugina sie pod ciezarem o kilka st za limit):
+                # jog W STRONE zakresu jest bezpieczny - cel lezy w zakresie, skok <= RECOVER_TOL + krok.
+                inward = (val < lo and step > 0) or (val > hi and step < 0)
+                if not (inward and min(abs(val - lo), abs(val - hi)) <= RECOVER_TOL):
                     raise RuntimeError(
                         f"{joint} poza zakresem kalibracji ({label} {val:.1f}, zakres {lo:.1f}..{hi:.1f}): "
-                        f"serwo skoczyloby do granicy o {min(abs(val - lo), abs(val - hi)):.0f} st - ustaw recznie"
+                        f"serwo skoczyloby do granicy o {min(abs(val - lo), abs(val - hi)):.0f} st - jog w strone zakresu"
+                        f" (do {RECOVER_TOL:.0f} st za granica) albo ustaw recznie"
                     )
             target = jog_target(start, step, *self.limits[joint])
             self._step_to({joint: target})

@@ -477,3 +477,26 @@ def test_drop_and_clear_points():
     assert len(panel.draft) == 2
     assert panel.submit({"cmd": "clear_points"})[0]
     assert panel.draft == []
+
+
+def test_jog_back_into_range_allowed_when_slightly_outside():
+    # Pi 2026-09-26: wrist_roll z kamera ugina sie ~4 st za granice kalibracji; "+" (do zakresu)
+    # ma dzialac, "-" (dalej za granice) dalej zablokowany
+    cfg = Config()
+    cfg.arm.motions_dir = MOTIONS_DIR
+    clock = FakeClock()
+    limits = limits_from_calibration(FAKE_CALIBRATION, FAKE_NORM_MODES)
+    lo = limits["wrist_roll"][0]
+    pose = dict(HOME_POSE)
+    pose["wrist_roll"] = lo - 4.0
+    arm = FakeSO101(pose=pose)
+    panel = ArmPanel(arm, cfg, limits, sleep=clock.sleep, clock=clock.now, manual_only=True)
+    assert panel.maybe_read()
+    panel.submit({"cmd": "jog", "joint": "wrist_roll", "step": -5})
+    panel.process_one()
+    assert "poza zakresem" in panel.last_error
+    assert arm.actions == []
+    panel.submit({"cmd": "jog", "joint": "wrist_roll", "step": 5})
+    panel.process_one()
+    assert panel.last_error is None
+    assert lo <= arm.pose["wrist_roll"] <= lo + 5.0
