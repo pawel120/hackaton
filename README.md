@@ -39,7 +39,7 @@ nieliniowe kola, port szeregowy).
 | Sciezka | Co to |
 |---|---|
 | `pinecone_bot/` | glowny stos: config, detektor, kamera, sterowniki bazy (Xiao, bipropellant, sim), ramie, maszyna stanow, symulator, `main.py` |
-| `tools/` | narzedzia na Pi: `snap_frames`, `calibrate_hsv`, `calibrate_target`, `record_waypoints`, `arm_play`, `base_test` |
+| `tools/` | narzedzia: `camera_geometry` (gdzie zamontowac kamere), `snap_frames`, `calibrate_hsv`, `calibrate_target`, `record_waypoints`, `arm_play`, `base_test`, `bip_probe` (czy hover gada bipropellantem) |
 | `motions/` | nagrane ruchy ramienia (`grasp_mid.json`, `home.json`, `drop_box.json`) |
 | `tests/` | testy bez sprzetu (`python -m pytest tests -q`), odpalane tez w GitHub Actions |
 | `pinecone_config.json` | jedyny plik konfiguracji robota; wypelniaja go narzedzia z `tools/` |

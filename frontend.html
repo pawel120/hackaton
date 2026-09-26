@@ -305,7 +305,7 @@ function connect() {
 }
 connect();
 
-// Heartbeat: the server stops the robot if it hears nothing for 0.5 s.
+// Heartbeat: the server stops the robot if it hears nothing for HEARTBEAT_TIMEOUT (1.0 s).
 setInterval(() => {
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
 }, 200);

@@ -46,7 +46,8 @@ LOOP_DELAY = 0.03  # matches the Arduino's loop delay / well under its 500ms tim
 
 # Operator dead-man: stop if the browser goes silent this long. The Xiao's own
 # watchdog can't catch a dropped WiFi link, because the Pi keeps sending commands.
-HEARTBEAT_TIMEOUT = 0.5
+# 1.0 s: the iPhone hotspot has latency spikes that tripped 0.5 s several times a second.
+HEARTBEAT_TIMEOUT = float(os.environ.get("ROBOT_HEARTBEAT_TIMEOUT", "1.0"))
 
 # Default values for the live-tunable params below (all overridable from the frontend).
 DEFAULT_PARAMS = {

@@ -563,6 +563,12 @@ Pytania do uzytkownika na starcie nastepnej sesji (nie zgaduj):
 **Nastepny krok:** przestawic kamere wyzej (STATUS krok 1); jesli glebia dalej slaba, sprobowac `--depth-res 480x270`.
 **Sprzet:** dotkniety (kamera, restart Pi)
 
+## 2026-09-26 - pawel120 (Claude) - kalibracja HSV na szyszkach
+**Zrobione:** klatki z Pi (`snap_frames.py`): tla wewnatrz, sama sztuczna trawa, 3 szyszki na trawie. Przeszukanie progow HSV -> lo [130,35,30], hi [179,100,125], min_area 120. Wynik: 3/3 szyszki po ustaleniu AWB, 0 falszywych na trawie, 22 na dywanach. Commit teleop_mirror.py + heartbeat 1.0 s.
+**Nie dziala / otwarte:** AWB kamery zmienia kolory przez ~1 s po starcie. Progi z jednej sceny i jednego swiatla. Hue szyszek zawija sie przez 0/180, detektor ma jeden zakres H (uzyty 130-179). Robot piszczal (plyta hovera?), przyczyna nieznana.
+**Nastepny krok:** klatki w innym swietle; zablokowac AWB/ekspozycje w camera.py.
+**Sprzet:** dotkniety (kamera)
+
 ## 2026-09-26 - pawel120 (Claude) - webowy panel recznego sterowania ramieniem
 **Zrobione:** `tools/arm_web.py` (HTTP na :8010, bez websocketow) + `arm_panel.html`: "-"/"+" dla kazdego stawu o krok 1/5/10, pozycje z serw (odczyt max 2 Hz, tylko gdy ramie stoi), HOME, otworz/zamknij chwytak, lista ruchow z `motions/`, STOP (tez spacja). Logika w `pinecone_bot/arm_panel.py`: kolejka (jedna komenda naraz, max 10 oczekujacych), zakres z kalibracji serw (`arm.calibration` + tryb normalizacji, jak lerobot), max_relative_target=None + wlasny krok 2 st/tick (chwytak 4) przy 25 Hz, jog liczony od ostatniej wyslanej komendy (bez sync_read). HOME i ruchy przez `WaypointArm`, STOP przerywa je miedzy tickami. Po starcie serwer sam jedzie do HOME, do tego czasu przyjmuje tylko HOME/STOP. `--fake` = atrapa ramienia na laptopie. Testy: `tests/test_arm_panel.py` (20).
 Panel jazdy i ramienia w jednym miejscu: UI ramienia w `arm_panel.js`, montowane w `frontend.html` (:8000, sekcja "RAMIE") i w `arm_panel.html` (:8010). Procesy zostaja osobne (blad magistrali serw nie zatrzymuje jazdy, lerobot tylko w arm_web). Glowny STOP jazdy wysyla tez STOP ramienia. CORS tylko dla originu :8000, POST wymaga application/json (obca strona w tej sieci nie przemyci komendy). `deploy/push_to_pi.sh` kopiuje teraz tez `arm_control.py`, `web_control.py`, `frontend.html`, `arm_panel.*` (wczesniej tylko pinecone_bot/tools/motions/tests).
