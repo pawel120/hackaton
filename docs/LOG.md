@@ -556,3 +556,9 @@ Pytania do uzytkownika na starcie nastepnej sesji (nie zgaduj):
   kamera+ramie)? Czy ma juz system/siec/zdalny dostep? Czy repo jest na
   nim sklonowane? Jak podsystemy maja sie komunikowac (jeden proces vs
   serwisy po sieci)?
+
+## 2026-09-26 - pawel120 (Claude) - glebia kamery w nizszej rozdzielczosci
+**Zrobione:** `rs_mjpeg_server.py`: glebia 424x240 (`--depth-res`), kolor zostaje 640x480 + align; zakres kolormapy `--max-mm` (domyslnie 1500, wczesniej ~8 m). Na Pi (z kopii w /tmp) dywan i chwytak z bliska maja ciagla glebie, wczesniej prawie cala glebia byla dziura/ciemna.
+**Nie dziala / otwarte:** SSH po WiFi zawieszalo sie (kex zrywany) po kilku ubitych sesjach, pomogl restart Pi. Blad `Couldn't resolve requests` = kamera zajeta przez stary proces, nie brak trybu (424x240@30 wspierane, USB3). `lsusb` mowi D435, docs D415.
+**Nastepny krok:** przestawic kamere wyzej (STATUS krok 1); jesli glebia dalej slaba, sprobowac `--depth-res 480x270`.
+**Sprzet:** dotkniety (kamera, restart Pi)
