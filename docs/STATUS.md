@@ -20,6 +20,7 @@ zadania i przypisania na tablicy Projects (link nizej). Czego nie ma tutaj albo 
   Dwa procesy na Pi: `web_control.py` i `tools/arm_web.py` (UI ramienia wspolne: `arm_panel.js`).
   Logika w `pinecone_bot/arm_panel.py` (kolejka, zakres z kalibracji, limit kroku), 22 testy; sprawdzony w przegladarce na atrapie (`--fake`).
   `--no-home`: bez HOME przy starcie, HOME i `motions/` wylaczone, tylko jog i chwytak (kamera siedzi teraz na ramieniu - HOME w nia uderzy).
+- Polaczenie laptop -> Pi (hotspot albo kabel) i odpalenie obu paneli (:8000 jazda, :8010 ramie): poradnik `docs/PANEL.md`, sprawdzone 2026-09-26. Na Pi `pytest` 136 zielonych (bez `test_calibrate_target.py`), `./arm.sh status` czyta 6 przegubow.
 - `motions/grasp_mid.json`: chwyt z `demo2_fixed.csv` (aktualna kalibracja). `home.json`, `drop_box.json` (placeholder).
 
 ## Nie dziala / nie sprawdzone
@@ -35,7 +36,8 @@ zadania i przypisania na tablicy Projects (link nizej). Czego nie ma tutaj albo 
 - Znak skretu Xiao i mapowanie PWM -> m/s niezmierzone (`cfg.base.xiao_*`, `cfg.control.steer_sign`).
 - Bipropellant na plycie hovera: wlasciciele mowia, ze jest, kod dzis jedzie przez Xiao. Test nie zrobiony:
   `python tools/bip_probe.py --port /dev/ttyAMA0` (nie rusza silnikow, sprawdza ASCII i protokol binarny na 3 baudach).
-- Pi nie ma internetu (WiFi nie dziala), kod wchodzi przez `deploy/push_to_pi.sh` / scp.
+- Pi jest w sieci po WiFi (hotspot iPhone, Maximize Compatibility ON) albo kablem 192.168.137.5; kod dalej wchodzi przez `deploy/push_to_pi.sh` / scp (bez `rsync` stare pliki na Pi zostaja, np. `tests/test_calibrate_target.py`).
+- `robot-web.service` nie jest zainstalowany: panel jazdy i ramienia odpala sie recznie w dwoch terminalach SSH (`docs/PANEL.md`).
 - Zasilanie z akumulatora 12 V: issue #8, nie zaczete.
 
 ## Nastepne 3 kroki (w tej kolejnosci)
