@@ -581,3 +581,9 @@ Panel jazdy i ramienia w jednym miejscu: UI ramienia w `arm_panel.js`, montowane
 **Nie dziala / otwarte:** na ramieniu siedzi kamera - HOME_POSE i nagrane ruchy trzeba sprawdzic/przepisac pod nowy montaz, zanim ktos uzyje trybu z HOME albo `pinecone_bot --real`.
 **Nastepny krok:** na Pi `python tools/arm_web.py --no-home`, jog 1 st na kazdym stawie, STOP.
 **Sprzet:** dotkniety (Pi: restart po utracie dysku, push kodu; ramie nie ruszane)
+
+## 2026-09-26 - pawel120 (Claude) - blokada jogu poza zakresem, heartbeat jazdy z klawiszami
+**Zrobione:** Na Pi odpalone `tools/arm_web.py --no-home` i `web_control.py` (nohup, logi `arm_web.log` / `web_control.log`; `robot-web.service` nie jest zainstalowany). Odczyt: `shoulder_lift` 127.7 st przy zakresie kalibracji +-91.6 - kazdy jog tego stawu bylby skokiem serwa o ~36 st do granicy (limit pozycji w EEPROM i tak tnie cel). Panel blokuje teraz jog stawu, ktory jest > 1 st poza zakresem (komenda albo odczyt), UI pokazuje "POZA ZAKRESEM". "Nie jedzie do przodu": w `web_control.log` failsafe heartbeatu co chwile (ping do Pi do 240 ms, straty na hotspocie), failsafe zeruje klawisze, a przegladarka wysylala W tylko przy wcisnieciu - trzymane W juz nie wracalo. Heartbeat (co 200 ms) niesie teraz stan klawiszy; sprawdzone lokalnie: przy zerwaniu robot staje, po powrocie lacza jedzie dalej.
+**Nie dziala / otwarte:** skoki opoznien hotspotu dalej zatrzymuja robota na chwile (tak ma byc przy utracie lacza > 1 s). Do sprawdzenia oszczedzanie energii WiFi na Pi (brak `iw` w systemie). `shoulder_lift` do ustawienia recznie / kalibracja pod kamere na ramieniu.
+**Nastepny krok:** restart obu serwerow na Pi z nowym kodem (ramie trzymane - connect zdejmuje na chwile torque); test jazdy W.
+**Sprzet:** dotkniety (Pi: serwery paneli; ramie i baza nie ruszane przez Claude)

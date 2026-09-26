@@ -225,7 +225,9 @@
         const m = marks[j];
         const [lo, hi] = s.limits[j];
         const p = s.positions[j];
-        m.v.textContent = p === undefined ? "-" : p.toFixed(1);
+        const out = p !== undefined && (p < lo - 1 || p > hi + 1);  // jog zablokowany na serwerze
+        m.v.textContent = p === undefined ? "-" : p.toFixed(1) + (out ? " POZA ZAKRESEM" : "");
+        m.v.style.color = out ? "var(--armp-bad)" : "";
         m.lo.textContent = lo.toFixed(0);
         m.hi.textContent = hi.toFixed(0);
         placeMark(m.p, p, lo, hi);

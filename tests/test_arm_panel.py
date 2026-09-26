@@ -358,3 +358,27 @@ def test_manual_only_jog_before_first_read_is_refused():
     panel.process_one()
     assert "odczyt" in panel.last_error
     assert arm.actions == []
+
+
+def test_jog_blocked_when_joint_outside_calibration_range():
+    # Pi 2026-09-26: shoulder_lift odczyt 127.7 przy zakresie +-91.6 (kamera na ramieniu);
+    # "-1" skonczyloby sie skokiem serwa o ~36 st do granicy
+    cfg = Config()
+    cfg.arm.motions_dir = MOTIONS_DIR
+    clock = FakeClock()
+    pose = dict(HOME_POSE)
+    pose["shoulder_lift"] = 127.7
+    arm = FakeSO101(pose=pose)
+    limits = limits_from_calibration(FAKE_CALIBRATION, FAKE_NORM_MODES)
+    panel = ArmPanel(arm, cfg, limits, sleep=clock.sleep, clock=clock.now, manual_only=True)
+    assert panel.maybe_read()
+    for step in (-1, 1, -10):
+        panel.submit({"cmd": "jog", "joint": "shoulder_lift", "step": step})
+        panel.process_one()
+        assert "poza zakresem" in panel.last_error
+    assert arm.actions == []
+    # inne stawy dalej dzialaja
+    panel.submit({"cmd": "jog", "joint": "elbow_flex", "step": 1})
+    panel.process_one()
+    assert panel.last_error is None
+    assert all(set(a) == {"elbow_flex.pos"} for a in arm.actions)

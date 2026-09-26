@@ -28,7 +28,9 @@ zadania i przypisania na tablicy Projects (link nizej). Czego nie ma tutaj albo 
 - HSV sprawdzone w jednym swietle; auto white balance kamery przez ~1 s po starcie daje zielona trawe i 0 detekcji (zablokowac AWB/ekspozycje w camera.py).
 - `lsusb` zglasza kamere jako D435 (8086:0b07), docs mowia D415 - sprawdzic model.
 - Kamera stoi za nisko: miejsce chwytu (17 cm przed kamera) jest w martwej strefie glebi (~31 cm). Trzeba przestawic.
-- Panel ramienia (`tools/arm_web.py`) NIE sprawdzony na prawdziwym ramieniu (pierwsze uruchomienie: czlowiek przy ramieniu, STOP pod reka).
+- Panel ramienia (`tools/arm_web.py --no-home`) chodzi na Pi, jog NIE sprawdzony na ramieniu.
+- `shoulder_lift` stoi poza zakresem kalibracji (odczyt 127.7 st, zakres +-91.6; kamera na ramieniu). Panel blokuje jog tego stawu - trzeba go ustawic recznie albo sprawdzic kalibracje pod nowy montaz (NIE `lerobot calibrate`).
+- Hotspot: ping do Pi skacze do 240 ms i gubi pakiety, heartbeat panelu jazdy (1 s) co chwile wpada w failsafe (robot staje na chwile).
 - Chwyty `grasp_near`, `grasp_far`, `drop_box` nie nagrane (config ma na razie tylko `grasp_mid`).
 - Znak skretu Xiao i mapowanie PWM -> m/s niezmierzone (`cfg.base.xiao_*`, `cfg.control.steer_sign`).
 - Bipropellant na plycie hovera: wlasciciele mowia, ze jest, kod dzis jedzie przez Xiao. Test nie zrobiony:
