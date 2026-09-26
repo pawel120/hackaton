@@ -9,8 +9,10 @@ do recznej jazdy odpala sie osobno (`python web_control.py`).
 Kolejnosc ma znaczenie: kazdy krok zapisuje cos, z czego korzysta nastepny.
 
 - [ ] `git pull` na laptopie (master z PR #14 i #16), `deploy/push_to_pi.sh`, na Pi `python -m pytest tests -q`.
-- [ ] **Kamera wyzej i za ramie**, patrzy w dol, miejsce chwytu 40-60 cm od obiektywu. Sprawdz w
-      `rs_mjpeg_server.py`, ze widac szyszke lezaca w miejscu, gdzie `grasp_mid` ja podnosi.
+- [ ] **Kamera na maszt, wyzej i za ramie**, patrzy w dol. Zmierz miarka, ile cm przed osia kol chwytak
+      zamyka sie w `grasp_mid` (i gdzie beda near/far), potem `python tools/camera_geometry.py --grasp-forward 0.30,0.35,0.40 --cam-forward -0.10`
+      (tabela wysokosc x kat; komorki OK = chwyty w kadrze i poza martwa strefa glebi). Startowy typ: 0.45 m, 38 st, 10 cm za osia.
+      Po zamontowaniu sprawdz w `rs_mjpeg_server.py`, ze widac szyszke lezaca w miejscu, gdzie `grasp_mid` ja podnosi.
 - [ ] `python tools/snap_frames.py --out frames/ --every 0.5 --seconds 20` na prawdziwej trawie z szyszkami.
 - [ ] `python tools/calibrate_hsv.py --source frames/`, klawisz `s` zapisuje prog do `pinecone_config.json`.
 - [ ] `python tools/arm_play.py --motion grasp_mid --port /dev/robot-arm --dry-run`, potem bez `--dry-run`
@@ -23,7 +25,8 @@ Kolejnosc ma znaczenie: kazdy krok zapisuje cos, z czego korzysta nastepny.
 - [ ] `python -m pinecone_bot.main --dry-run` (kamera prawdziwa, komendy tylko drukowane): czy `v`/`w` maja sens?
 - [ ] `python -m pinecone_bot.main --real` z wylacznikiem w rece, jedna szyszka, potem piec.
 - [ ] Wynik (co zadzialalo, co nie, liczby) do `docs/STATUS.md` i `docs/LOG.md`.
-- [ ] Jesli jest czas: test bipropellanta po UART (`unlockASCII`, sekcja "Hoverboard" nizej).
+- [ ] Jesli jest czas: `python tools/bip_probe.py --port /dev/ttyAMA0` (przejsciowka USB-UART na zlacze plytki bocznej
+      hovera; nie rusza silnikow). Odpowiada? Sekcja "Hoverboard" nizej mowi, co przestawic w configu.
 
 ## Idea w 5 zdaniach
 
