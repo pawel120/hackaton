@@ -12,17 +12,17 @@
   "detector": {
     "hsv": {
       "lo": [
-        5,
-        60,
-        20
+        130,
+        35,
+        30
       ],
       "hi": [
-        25,
-        255,
-        200
+        179,
+        100,
+        125
       ]
     },
-    "min_area_px": 60,
+    "min_area_px": 120,
     "max_area_px": 40000,
     "blur_ksize": 5,
     "morph_ksize": 5,
