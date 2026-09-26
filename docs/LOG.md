@@ -593,3 +593,9 @@ Panel jazdy i ramienia w jednym miejscu: UI ramienia w `arm_panel.js`, montowane
 **Nie dziala / otwarte:** nic z tego nie ruszalo na sprzecie. Kroki jazdy sa "na czas" (open-loop): powtarzalnosc zalezy od baterii i podloza, PWM -> m/s nadal niezmierzone. Stare ruchy (`grasp_mid`, `home`, `drop_box`) koncza w HOME - w trybie `--no-home` odtwarzac tylko ruchy nagrane pod obecny montaz (UI ostrzega). Przy hotspocie failsafe heartbeatu przerwie sekwencje tak samo jak jazde reczna.
 **Nastepny krok:** na Pi restart obu serwerow z mastera, jog + nagranie `grasp_cam` z panelu (czlowiek przy wylaczniku), potem sekwencja: podjazd 1-2 s -> `grasp_cam` -> cofniecie; zmierzyc ile cm daje 0.3 x 2 s.
 **Sprzet:** nie
+
+## 2026-09-26 - pawel120 (Claude) - jog XYZ ramienia w panelu
+**Zrobione:** `pinecone_bot/kinematics.py`: FK z URDF `so101_new_calib.urdf` (numpy, bez ikpy) i krok IK (DLS) dla TCP (gripper_frame_link): przesuniecie o 5/10/20 mm w osiach bazy, pochylenie chwytaka bez zmian. Panel ramienia: sekcja JOG XYZ (GORA/DOL/PRZOD/TYL/LEWO/PRAWO), odczyt TCP, przycisk ZERO URDF (biezacy odczyt = zero URDF, offsety do `pinecone_config.json`: `arm.urdf_offset_deg`, znaki `arm.urdf_sign`). 150 testow zielonych, sekcja widoczna w przegladarce na atrapie.
+**Nie dziala / otwarte:** nie sprawdzone na ramieniu. Zero lerobot to srodek nagranego zakresu, nie zero URDF (HARDWARE pulapka 12) - bez ZERO URDF jog pojedzie krzywo. Znaki przegubow niezmierzone (domyslnie +1).
+**Nastepny krok:** na Pi: ramie prosto poziomo do przodu -> ZERO URDF -> GORA 10 mm, sprawdzic kierunek.
+**Sprzet:** nie

@@ -41,7 +41,7 @@ cd "$REPO_DIR"
 
 # arm_control.py: WaypointArm i tools/arm_web.py; web_control.py + frontend.html + arm_panel.*: panel jazdy i ramienia;
 # sequences/: zhardkodowane sekwencje jazda + ramie z panelu
-ITEMS=(pinecone_bot tools motions sequences tests requirements-pinecone.txt
+ITEMS=(pinecone_bot tools motions sequences tests so101_urdf requirements-pinecone.txt
        arm_control.py web_control.py frontend.html arm_panel.html arm_panel.js)
 if [[ -f pinecone_config.json ]]; then
   ITEMS+=(pinecone_config.json)
