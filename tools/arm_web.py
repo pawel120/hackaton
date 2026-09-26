@@ -5,7 +5,10 @@ Uzycie (na Pi, z katalogu repo):
     python tools/arm_web.py --port /dev/robot-arm
     python tools/arm_web.py --fake                # atrapa ramienia, bez lerobot (laptop)
 
-Potem w przegladarce: http://<IP_PI>:8010
+Potem w przegladarce: http://<IP_PI>:8010 (sam panel ramienia) albo
+http://<IP_PI>:8000 (panel jazdy web_control.py z sekcja ramienia - ten sam
+arm_panel.js, pyta ten serwer przez CORS). Dwa osobne procesy: blad magistrali
+ramienia nie zatrzymuje jazdy, a lerobot jest importowany tylko tutaj.
 
 Po starcie ramie NAJPIERW jedzie do HOME; do tego czasu panel przyjmuje tylko
 HOME i STOP. Jedna komenda naraz (kolejka w pinecone_bot/arm_panel.py),
@@ -39,9 +42,14 @@ from pinecone_bot.arm_panel import (  # noqa: E402
 )
 from pinecone_bot.config import Config  # noqa: E402
 
-PAGE = os.path.join(REPO_ROOT, "arm_panel.html")
+STATIC = {
+    "/": ("arm_panel.html", "text/html; charset=utf-8"),
+    "/arm_panel.html": ("arm_panel.html", "text/html; charset=utf-8"),
+    "/arm_panel.js": ("arm_panel.js", "text/javascript; charset=utf-8"),
+}
 HTTP_PORT = 8010
 MAX_BODY = 4096
+DRIVE_PANEL_PORT = 8000  # web_control.py; tylko jego strona moze wolac API z innego originu
 
 log = logging.getLogger("arm_web")
 
@@ -61,7 +69,13 @@ def connect_real_arm(port: str, arm_id: str):
     return arm, limits
 
 
-def make_handler(panel: ArmPanel):
+def origin_port_ok(origin: str, ports) -> bool:
+    """True dla http://<dowolny host>:<port z listy>. Host zalezy od sieci (hotspot, LAN), port nie."""
+    scheme, _, rest = origin.partition("://")
+    return scheme == "http" and "/" not in rest and rest.rsplit(":", 1)[-1] in {str(p) for p in ports}
+
+
+def make_handler(panel: ArmPanel, own_port: int = HTTP_PORT):
     class Handler(http.server.BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):  # bez linii w konsoli co 0.5 s od odpytywania stanu
             pass
@@ -71,16 +85,34 @@ def make_handler(panel: ArmPanel):
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            self._cors()
             self.end_headers()
             self.wfile.write(body)
 
         def _json(self, code: int, payload: dict) -> None:
             self._send(code, json.dumps(payload).encode("ascii"), "application/json")
 
+        def _cors(self) -> None:
+            # frontend.html (panel jazdy, :8000) pyta ten serwer z innego portu. Nie "*":
+            # inaczej dowolna strona otwarta w przegladarce w tej sieci moglaby ruszac ramieniem.
+            origin = self.headers.get("Origin") or ""
+            if origin_port_ok(origin, [DRIVE_PANEL_PORT]):
+                self.send_header("Access-Control-Allow-Origin", origin)
+                self.send_header("Vary", "Origin")
+
+        def do_OPTIONS(self):  # preflight CORS przed POST z application/json
+            self.send_response(204)
+            self._cors()
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Access-Control-Max-Age", "600")
+            self.end_headers()
+
         def do_GET(self):
-            if self.path in ("/", "/index.html", "/arm_panel.html"):
-                with open(PAGE, "rb") as fh:
-                    self._send(200, fh.read(), "text/html; charset=utf-8")
+            if self.path in STATIC:
+                name, ctype = STATIC[self.path]
+                with open(os.path.join(REPO_ROOT, name), "rb") as fh:
+                    self._send(200, fh.read(), ctype)
             elif self.path == "/api/state":
                 self._json(200, panel.snapshot())
             else:
@@ -89,6 +121,15 @@ def make_handler(panel: ArmPanel):
         def do_POST(self):
             if self.path != "/api/cmd":
                 self._json(404, {"ok": False, "msg": "nie ma"})
+                return
+            # Komendy tylko z naszych stron. application/json wymusza preflight CORS, wiec obca
+            # strona nie przemyci komendy "prostym" POST-em (text/plain), ktory idzie bez pytania.
+            origin = self.headers.get("Origin")
+            if origin and not origin_port_ok(origin, [DRIVE_PANEL_PORT, own_port]):
+                self._json(403, {"ok": False, "msg": "obcy origin"})
+                return
+            if not (self.headers.get("Content-Type") or "").startswith("application/json"):
+                self._json(415, {"ok": False, "msg": "wymagany application/json"})
                 return
             length = int(self.headers.get("Content-Length") or 0)
             if length <= 0 or length > MAX_BODY:
@@ -139,7 +180,7 @@ def main() -> int:
     panel.start(home_first=True)
     print("ramie jedzie do HOME...")
 
-    httpd = http.server.ThreadingHTTPServer((args.host, args.http_port), make_handler(panel))
+    httpd = http.server.ThreadingHTTPServer((args.host, args.http_port), make_handler(panel, args.http_port))
     print(f"panel: http://<IP>:{args.http_port} (nasluch {args.host})")
     try:
         httpd.serve_forever()

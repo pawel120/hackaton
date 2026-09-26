@@ -297,3 +297,20 @@ def test_command_error_keeps_panel_alive():
     assert "status packet" in panel.last_error
     snap = panel.snapshot()
     assert snap["busy"] is None and snap["homed"]
+
+
+# ---------------------------------------------------------------------------
+# serwer: kto moze wolac API (tools/arm_web.py)
+# ---------------------------------------------------------------------------
+
+def test_origin_check_allows_only_our_panels():
+    sys.path.insert(0, os.path.join(REPO_ROOT, "tools"))
+    import arm_web
+
+    ports = [8000, 8010]
+    assert arm_web.origin_port_ok("http://172.20.10.4:8000", ports)
+    assert arm_web.origin_port_ok("http://localhost:8010", ports)
+    assert not arm_web.origin_port_ok("http://evil.example", ports)
+    assert not arm_web.origin_port_ok("http://evil.example:8080", ports)
+    assert not arm_web.origin_port_ok("https://172.20.10.4:8000", ports)
+    assert not arm_web.origin_port_ok("http://evil.example/x:8000", ports)
