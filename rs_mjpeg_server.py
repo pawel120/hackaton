@@ -1,11 +1,15 @@
 """Podglad na zywo z RealSense D415 przez przegladarke (MJPEG po HTTP).
 
 Uzycie na Pi:
-    python rs_mjpeg_server.py [--port 8080] [--depth-res 424x240] [--max-mm 1500]
+    python rs_mjpeg_server.py [--port 8080] [--depth-res 424x240] [--colormap viewer|fixed] [--max-mm 1500]
 
 Glebia w nizszej rozdzielczosci ma mniejszy minimalny zasieg (MinZ w D4xx skaluje sie
 z rozdzielczoscia glebi), wiec bliskie obiekty przestaja byc dziura. Kolor zostaje 640x480,
 glebia jest wyrownywana do koloru przez rs.align.
+
+Kolory glebi: domyslnie jak RealSense Viewer (rs.colorizer: Jet z wyrownaniem histogramu,
+brak danych = czarny). Stara skala liniowa 0..--max-mm (`--colormap fixed`) zlewala podloge
+w jeden gradient i szyszki (kilka cm) byly na niej niewidoczne, choc glebia je miala.
 
 Potem w przegladarce na laptopie: http://<IP_PI>:8080/
 Zatrzymanie: Ctrl+C.
@@ -22,7 +26,8 @@ import pyrealsense2 as rs
 
 WIDTH, HEIGHT, FPS = 640, 480, 30
 DEPTH_WIDTH, DEPTH_HEIGHT = 424, 240
-MAX_MM = 1500  # odleglosc, przy ktorej kolormapa sie nasyca
+MAX_MM = 1500  # odleglosc, przy ktorej kolormapa sie nasyca (tylko --colormap fixed)
+COLORMAP = "viewer"  # "viewer" = rs.colorizer jak w RealSense Viewer, "fixed" = liniowo 0..MAX_MM
 
 latest_jpg = None
 latest_lock = threading.Lock()
@@ -38,8 +43,9 @@ def capture_loop():
     profile = pipeline.start(config)
     depth_scale = profile.get_device().first_depth_sensor().get_depth_scale()
     alpha = 255.0 / (MAX_MM / 1000.0 / depth_scale)
-    print(f"RealSense: color {WIDTH}x{HEIGHT}, depth {DEPTH_WIDTH}x{DEPTH_HEIGHT}")
+    print(f"RealSense: color {WIDTH}x{HEIGHT}, depth {DEPTH_WIDTH}x{DEPTH_HEIGHT}, colormap {COLORMAP}")
     align = rs.align(rs.stream.color)
+    colorizer = rs.colorizer()  # domyslne ustawienia = te same co w RealSense Viewer
     print("RealSense: stream started")
     try:
         while not stop_event.is_set():
@@ -50,10 +56,14 @@ def capture_loop():
             if not color_frame or not depth_frame:
                 continue
             color_image = np.asanyarray(color_frame.get_data())
-            depth_image = np.asanyarray(depth_frame.get_data())
-            depth_colormap = cv2.applyColorMap(
-                cv2.convertScaleAbs(depth_image, alpha=alpha), cv2.COLORMAP_JET
-            )
+            if COLORMAP == "viewer":
+                rgb = np.asanyarray(colorizer.colorize(depth_frame).get_data())
+                depth_colormap = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+            else:
+                depth_image = np.asanyarray(depth_frame.get_data())
+                depth_colormap = cv2.applyColorMap(
+                    cv2.convertScaleAbs(depth_image, alpha=alpha), cv2.COLORMAP_JET
+                )
             combined = np.hstack((color_image, depth_colormap))
             ok, buf = cv2.imencode(".jpg", combined, [cv2.IMWRITE_JPEG_QUALITY, 80])
             if ok:
@@ -109,17 +119,20 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    global DEPTH_WIDTH, DEPTH_HEIGHT, MAX_MM
+    global DEPTH_WIDTH, DEPTH_HEIGHT, MAX_MM, COLORMAP
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--depth-res", default=f"{DEPTH_WIDTH}x{DEPTH_HEIGHT}",
                         help="rozdzielczosc glebi, np. 424x240, 480x270, 640x480")
+    parser.add_argument("--colormap", choices=("viewer", "fixed"), default=COLORMAP,
+                        help="viewer = jak RealSense Viewer (wyrownanie histogramu), fixed = liniowo 0..--max-mm")
     parser.add_argument("--max-mm", type=int, default=MAX_MM,
-                        help="odleglosc [mm] dla czerwonego koloru kolormapy")
+                        help="odleglosc [mm] dla czerwonego koloru (tylko --colormap fixed)")
     args = parser.parse_args()
 
     DEPTH_WIDTH, DEPTH_HEIGHT = (int(v) for v in args.depth_res.lower().split("x"))
     MAX_MM = args.max_mm
+    COLORMAP = args.colormap
 
     t = threading.Thread(target=capture_loop, daemon=True)
     t.start()
