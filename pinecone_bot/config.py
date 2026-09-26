@@ -13,7 +13,11 @@ from dataclasses import asdict, dataclass, field
 
 @dataclass
 class HsvRange:
-    """Prog HSV w skali OpenCV (H 0..179, S 0..255, V 0..255). Domyslnie 'brazowe'."""
+    """
+    Prog HSV w skali OpenCV (H 0..179, S 0..255, V 0..255). Domyslnie 'brazowe'.
+    lo[0] > hi[0] oznacza zakres H przechodzacy przez 180 (np. 140..15 = czerwien/braz
+    z obu koncow skali) - detektor sumuje wtedy dwa przedzialy.
+    """
     lo: tuple = (5, 60, 20)
     hi: tuple = (25, 255, 200)
 
