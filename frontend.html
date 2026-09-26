@@ -306,11 +306,12 @@ function connect() {
 connect();
 
 // Heartbeat: the server stops the robot if it hears nothing for HEARTBEAT_TIMEOUT (1.0 s)
-// and clears its keys. The heartbeat carries the key state, so a key still held after a
-// hotspot latency spike takes effect again instead of the robot staying stopped until
-// the key is pressed anew.
+// and clears its keys. Plain ping on purpose - do NOT put the key state in it: on the
+// hotspot, delayed heartbeats arrive in bursts and stale "W held" messages would restart
+// the robot after the failsafe (2026-09-26: robot drove into the arm). After a failsafe
+// the operator has to press the key again.
 setInterval(() => {
-  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'keys', ...keys }));
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
 }, 200);
 
 const keyMap = { KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd' };
