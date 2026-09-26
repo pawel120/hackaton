@@ -19,6 +19,10 @@ Komendy (slowniki, jak przychodza z przegladarki):
 Przed pierwszym udanym HOME przyjmowane sa tylko "home" i "stop"
 (serwer po starcie sam wrzuca HOME do kolejki).
 
+manual_only=True (tools/arm_web.py --no-home, np. gdy na ramieniu siedzi kamera):
+bez HOME przy starcie, "home" i "motion" odrzucane (ruchy z motions/ tez koncza
+w pozie HOME), jog i chwytak od razu, liczone od odczytanej pozycji.
+
 Jog liczy cel od OSTATNIEJ WYSLANEJ komendy (setpoint), a nie od odczytu -
 dzieki temu komenda nie robi sync_read. HOME i ruchy z motions/ odtwarza
 WaypointArm (pinecone_bot/arm.py) z tym samym ramieniem.
@@ -164,6 +168,7 @@ class ArmPanel:
         rate_hz: float = 25.0,
         max_step: dict | None = None,
         read_period_s: float = 0.5,
+        manual_only: bool = False,
     ):
         self.cfg = cfg
         self.limits = dict(limits)
@@ -183,7 +188,8 @@ class ArmPanel:
         self._gen = 0              # zwiekszane przez STOP; komenda ze starsza generacja = przerwana
         self._running: _Cmd | None = None
         self._current_gen = 0
-        self.homed = False
+        self.manual_only = manual_only
+        self.homed = manual_only   # manual_only: brak bramki HOME, jog od odczytu
         self.positions: dict = {}  # ostatni odczyt z serw
         self.last_read_t: float | None = None
         self.last_error: str | None = None
@@ -218,6 +224,8 @@ class ArmPanel:
             if name not in list_motions(self.cfg.arm.motions_dir):
                 return False, f"brak ruchu '{name}' w motions/"
             data = {"cmd": "motion", "name": name}
+        if self.manual_only and cmd in ("home", "motion"):
+            return False, "HOME i ruchy z motions/ wylaczone (--no-home)"
         with self._lock:
             if not self.homed and cmd != "home":
                 return False, "najpierw HOME"
@@ -247,6 +255,7 @@ class ArmPanel:
                 "busy": running,
                 "queue": len(self._queue),
                 "homed": self.homed,
+                "manual_only": self.manual_only,
                 "error": self.last_error,
                 "result": self.last_result,
                 "read_age_s": None if self.last_read_t is None else round(self._clock() - self.last_read_t, 1),
@@ -318,7 +327,8 @@ class ArmPanel:
         pose = {**self.positions, **self.arm.last_sent}
         missing = [j for j in JOINT_NAMES if j not in pose]
         if missing:
-            raise RuntimeError(f"nie znam pozycji {missing} - wcisnij HOME")
+            hint = "poczekaj na odczyt pozycji" if self.manual_only else "wcisnij HOME"
+            raise RuntimeError(f"nie znam pozycji {missing} - {hint}")
         return pose
 
     def _step_to(self, target: dict) -> None:
@@ -368,7 +378,7 @@ class ArmPanel:
                     self._wake.wait(timeout=self.read_period_s)
 
     def start(self, home_first: bool = True) -> None:
-        if home_first:
+        if home_first and not self.manual_only:
             with self._lock:
                 self._queue.append(_Cmd({"cmd": "home"}, self._gen))
         self._thread = threading.Thread(target=self.run_forever, name="arm-panel", daemon=True)

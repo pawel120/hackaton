@@ -81,7 +81,7 @@
         <div class="armp-title">STAWY <span class="armp-muted">(zielony = odczyt z serw, niebieski = ostatnia komenda)</span></div>
         <div class="armp-joints"></div>
       </div>
-      <div class="armp-sec">
+      <div class="armp-sec armp-poses">
         <div class="armp-title">POZYCJE</div>
         <div class="armp-row">
           <button data-cmd="home" data-always="1">HOME</button>
@@ -89,7 +89,7 @@
           <button data-cmd="close">Zamknij chwytak</button>
         </div>
       </div>
-      <div class="armp-sec">
+      <div class="armp-sec armp-mot">
         <div class="armp-title">RUCHY Z motions/</div>
         <div class="armp-row armp-motions"></div>
       </div>
@@ -212,6 +212,10 @@
       let st = s.busy ? busyText(s.busy) : "gotowe";
       if (s.queue) st += ` (w kolejce: ${s.queue})`;
       if (!s.homed) st = (s.busy ? "jadę do HOME..." : "czekam na HOME") + " - inne komendy zablokowane";
+      if (s.manual_only) st += " | tryb bez HOME: tylko stawy i chwytak";
+      // --no-home: HOME i ruchy z motions/ wylaczone na serwerze, chowamy je (chwytak zostaje)
+      q(".armp-mot").style.display = s.manual_only ? "none" : "";
+      q('[data-cmd="home"]').style.display = s.manual_only ? "none" : "";
       el.st.textContent = st;
       el.result.textContent = s.result || "";
       if (s.error) el.error.textContent = "Błąd: " + s.error;

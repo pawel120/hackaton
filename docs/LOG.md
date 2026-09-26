@@ -575,3 +575,9 @@ Panel jazdy i ramienia w jednym miejscu: UI ramienia w `arm_panel.js`, montowane
 **Nie dziala / otwarte:** nie uruchomione na prawdziwym ramieniu. `arm_control.open_gripper/go_home` nie uzyte wprost: `move_to` robi sync_read przy kazdym wywolaniu i skacze bez limitu kroku (pulapka 10); zamiast tego te same wartosci (0/100, `motions/home.json`) przez limit kroku. Ctrl+C = disconnect = torque off, ramie opada - najpierw HOME.
 **Nastepny krok:** na Pi `python tools/arm_web.py`, czlowiek przy ramieniu; sprawdzic HOME przy starcie, jog 1 st, STOP w trakcie `grasp_mid`.
 **Sprzet:** nie
+
+## 2026-09-26 - pawel120 (Claude) - panel ramienia bez HOME (kamera na ramieniu)
+**Zrobione:** `tools/arm_web.py --no-home` (`ArmPanel(manual_only=True)`): bez HOME przy starcie, serwer odrzuca "home" i "motion" (ruchy z motions/ tez koncza w HOME), jog i chwytak od razu, liczone od odczytanej pozycji; UI chowa HOME i liste ruchow. 2 testy. Po drodze: Pi zgubil pendrive systemowy (`Input/output error` na kazdej komendzie), po odlaczeniu zasilania wstal czysto (root rw, dmesg bez bledow). Kod z mastera (#31) wypchniety na Pi, testy panelu na Pi zielone.
+**Nie dziala / otwarte:** na ramieniu siedzi kamera - HOME_POSE i nagrane ruchy trzeba sprawdzic/przepisac pod nowy montaz, zanim ktos uzyje trybu z HOME albo `pinecone_bot --real`.
+**Nastepny krok:** na Pi `python tools/arm_web.py --no-home`, jog 1 st na kazdym stawie, STOP.
+**Sprzet:** dotkniety (Pi: restart po utracie dysku, push kodu; ramie nie ruszane)

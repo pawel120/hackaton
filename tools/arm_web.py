@@ -4,6 +4,7 @@ Uzycie (na Pi, z katalogu repo):
     python tools/arm_web.py                       # port ramienia z ROBOT_ARM_PORT albo cfg.arm.port
     python tools/arm_web.py --port /dev/robot-arm
     python tools/arm_web.py --fake                # atrapa ramienia, bez lerobot (laptop)
+    python tools/arm_web.py --no-home             # bez HOME (np. kamera na ramieniu): tylko jog i chwytak
 
 Potem w przegladarce: http://<IP_PI>:8010 (sam panel ramienia) albo
 http://<IP_PI>:8000 (panel jazdy web_control.py z sekcja ramienia - ten sam
@@ -158,6 +159,8 @@ def main() -> int:
     parser.add_argument("--host", default=os.environ.get("ROBOT_HOST", "0.0.0.0"))
     parser.add_argument("--http-port", type=int, default=HTTP_PORT)
     parser.add_argument("--fake", action="store_true", help="atrapa ramienia (bez lerobot i sprzetu)")
+    parser.add_argument("--no-home", action="store_true",
+                        help="bez HOME przy starcie; HOME i ruchy z motions/ wylaczone, tylko jog i chwytak")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -176,9 +179,12 @@ def main() -> int:
     for joint, (lo, hi) in limits.items():
         print(f"  zakres {joint:14s} {lo:8.1f} .. {hi:8.1f}")
 
-    panel = ArmPanel(arm, cfg, limits)
+    panel = ArmPanel(arm, cfg, limits, manual_only=args.no_home)
     panel.start(home_first=True)
-    print("ramie jedzie do HOME...")
+    if args.no_home:
+        print("--no-home: ramie stoi, HOME i ruchy z motions/ wylaczone; jog od odczytanej pozycji")
+    else:
+        print("ramie jedzie do HOME...")
 
     httpd = http.server.ThreadingHTTPServer((args.host, args.http_port), make_handler(panel, args.http_port))
     print(f"panel: http://<IP>:{args.http_port} (nasluch {args.host})")

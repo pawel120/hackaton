@@ -314,3 +314,47 @@ def test_origin_check_allows_only_our_panels():
     assert not arm_web.origin_port_ok("http://evil.example:8080", ports)
     assert not arm_web.origin_port_ok("https://172.20.10.4:8000", ports)
     assert not arm_web.origin_port_ok("http://evil.example/x:8000", ports)
+
+
+# ---------------------------------------------------------------------------
+# --no-home (kamera na ramieniu)
+# ---------------------------------------------------------------------------
+
+def test_manual_only_never_homes_and_jogs_from_read():
+    cfg = Config()
+    cfg.arm.motions_dir = MOTIONS_DIR
+    clock = FakeClock()
+    arm = FakeSO101()
+    start_pose = dict(arm.pose)
+    limits = limits_from_calibration(FAKE_CALIBRATION, FAKE_NORM_MODES)
+    panel = ArmPanel(arm, cfg, limits, sleep=clock.sleep, clock=clock.now, manual_only=True)
+    panel.start(home_first=True)   # watek: tylko odczyty, zadnego HOME
+    import time
+    deadline = time.monotonic() + 5.0
+    while not panel.positions and time.monotonic() < deadline:
+        time.sleep(0.01)
+    panel.shutdown()
+    assert arm.actions == [], "manual_only nie moze ruszyc ramieniem sam z siebie"
+    assert panel.snapshot()["manual_only"]
+
+    for cmd in ({"cmd": "home"}, {"cmd": "motion", "name": "grasp_mid"}):
+        ok, msg = panel.submit(cmd)
+        assert not ok and "no-home" in msg
+    assert panel.submit({"cmd": "jog", "joint": "shoulder_lift", "step": -5})[0]
+    panel.process_one()
+    assert panel.last_error is None, panel.last_error
+    assert arm.pose["shoulder_lift"] == pytest.approx(start_pose["shoulder_lift"] - 5)
+    # pozostale stawy nietkniete, wysylany tylko jogowany
+    assert all(set(a) == {"shoulder_lift.pos"} for a in arm.actions)
+    assert {j: arm.pose[j] for j in JOINT_NAMES if j != "shoulder_lift"} == \
+        {j: start_pose[j] for j in JOINT_NAMES if j != "shoulder_lift"}
+
+
+def test_manual_only_jog_before_first_read_is_refused():
+    panel, arm, _ = make_panel(homed=False)
+    panel.manual_only = True
+    panel.homed = True
+    panel.submit({"cmd": "jog", "joint": "elbow_flex", "step": 1})
+    panel.process_one()
+    assert "odczyt" in panel.last_error
+    assert arm.actions == []
