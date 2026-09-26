@@ -16,12 +16,24 @@ Komendy (slowniki, jak przychodza z przegladarki):
     {"cmd": "motion", "name": "grasp_mid"}
     {"cmd": "stop"}          (nie idzie do kolejki, dziala od razu)
 
+Nagrywanie ruchu z panelu (od razu, bez kolejki; szkic trzymany w panelu):
+    {"cmd": "add_point", "label": "nad szyszka", "seconds": 1.5, "check_gripper": false}
+        dodaje BIEZACA poze: przeguby z odczytu serw (lub ostatniej komendy, gdy
+        odczytu brak), chwytak z ostatniej komendy (po "close" = 0, czyli zacisk;
+        odczyt zamknietego chwytaka to szerokosc szyszki, nie cel).
+    {"cmd": "drop_point"} / {"cmd": "clear_points"}
+    {"cmd": "save_motion", "name": "grasp_cam", "note": "...", "overwrite": false}
+        zapisuje szkic do motions/<name>.json (format jak tools/record_waypoints.py).
+
 Przed pierwszym udanym HOME przyjmowane sa tylko "home" i "stop"
 (serwer po starcie sam wrzuca HOME do kolejki).
 
 manual_only=True (tools/arm_web.py --no-home, np. gdy na ramieniu siedzi kamera):
-bez HOME przy starcie, "home" i "motion" odrzucane (ruchy z motions/ tez koncza
-w pozie HOME), jog i chwytak od razu, liczone od odczytanej pozycji.
+bez HOME przy starcie, "home" odrzucane, jog i chwytak od razu, liczone od
+odczytanej pozycji. Ruchy z motions/ sa dozwolone (nagrywa sie je z panelu pod
+biezacy montaz), ale przy pustym chwycie ramie NIE wraca do HOME (home_on_empty=False).
+UWAGA: stare ruchy (grasp_mid, home, drop_box) koncza w HOME_POSE - w tym trybie
+odtwarzaj tylko ruchy nagrane pod aktualny montaz.
 
 Jog liczy cel od OSTATNIEJ WYSLANEJ komendy (setpoint), a nie od odczytu -
 dzieki temu komenda nie robi sync_read. HOME i ruchy z motions/ odtwarza
@@ -32,11 +44,22 @@ from __future__ import annotations
 import collections
 import logging
 import os
+import re
 import threading
 import time
 from typing import Callable
 
-from .arm import GRIPPER_OPEN, HOME_POSE, JOINT_NAMES, WaypointArm, resolve_motions_dir
+from .arm import (
+    GRIPPER_OPEN,
+    HOME_POSE,
+    JOINT_NAMES,
+    Motion,
+    Waypoint,
+    WaypointArm,
+    motion_path,
+    resolve_motions_dir,
+    save_motion,
+)
 
 log = logging.getLogger(__name__)
 
@@ -46,6 +69,8 @@ MAX_QUEUE = 10                # wiecej oczekujacych komend = klikanie na oslep, 
 # Staw dalej niz tyle poza zakresem kalibracji = jog zablokowany. Serwo i tak utnie cel do
 # swojego limitu pozycji (EEPROM), wiec "ruch o 1 st" stalby sie skokiem do granicy zakresu.
 OUT_OF_RANGE_TOL = 1.0
+MAX_DRAFT = 40                # waypointow w szkicu ruchu nagrywanego z panelu
+MOTION_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
 RAW_RESOLUTION = 4095         # STS3215: 4096 krokow, lerobot dzieli przez (4096 - 1)
 
 # Maksymalna zmiana celu na jeden tick (stopnie; gripper w jednostkach 0-100).
@@ -182,8 +207,12 @@ class ArmPanel:
         self._clock = clock
 
         self.arm = RecordingArm(arm)
-        # WaypointArm spi przez _sleep, wiec STOP przerywa tez odtwarzanie motions/
-        self.waypoints = WaypointArm(cfg, arm=self.arm, sleep=self._sleep, clock=clock)
+        # WaypointArm spi przez _sleep, wiec STOP przerywa tez odtwarzanie motions/.
+        # manual_only: po pustym chwycie bez powrotu do HOME (kamera na ramieniu).
+        self.waypoints = WaypointArm(
+            cfg, arm=self.arm, sleep=self._sleep, clock=clock, home_on_empty=not manual_only
+        )
+        self.draft: list = []      # Waypoint-y nagrywane z panelu (add_point), do save_motion
 
         self._lock = threading.Lock()
         self._wake = threading.Condition(self._lock)
@@ -209,6 +238,8 @@ class ArmPanel:
         if cmd == "stop":
             self.stop()
             return True, "STOP"
+        if cmd in ("add_point", "drop_point", "clear_points", "save_motion"):
+            return self._draft_cmd(cmd, data)
         if cmd not in ("jog", "home", "open", "close", "motion"):
             return False, f"nieznana komenda '{cmd}'"
         if cmd == "jog":
@@ -227,8 +258,8 @@ class ArmPanel:
             if name not in list_motions(self.cfg.arm.motions_dir):
                 return False, f"brak ruchu '{name}' w motions/"
             data = {"cmd": "motion", "name": name}
-        if self.manual_only and cmd in ("home", "motion"):
-            return False, "HOME i ruchy z motions/ wylaczone (--no-home)"
+        if self.manual_only and cmd == "home":
+            return False, "HOME wylaczone (--no-home)"
         with self._lock:
             if not self.homed and cmd != "home":
                 return False, "najpierw HOME"
@@ -245,13 +276,82 @@ class ArmPanel:
             self._wake.notify()
         log.info("STOP")
 
+    # --- nagrywanie ruchu z panelu -------------------------------------------
+
+    def current_pose(self) -> dict:
+        """Poza do zapisu: przeguby z odczytu (brak -> ostatnia komenda), chwytak z komendy.
+
+        Odczyt zamknietego chwytaka to szerokosc trzymanej szyszki, a nie cel zacisku;
+        ostatnia komenda ("close" = 0) jest tym, co ruch ma potem powtorzyc.
+        """
+        sent = dict(self.arm.last_sent)
+        with self._lock:
+            read = dict(self.positions)
+        pose = {}
+        for joint in JOINT_NAMES:
+            if joint == "gripper":
+                val = sent.get(joint, read.get(joint))
+            else:
+                val = read.get(joint, sent.get(joint))
+            if val is None:
+                raise RuntimeError(f"nie znam pozycji {joint} - poczekaj na odczyt albo rusz stawem")
+            pose[joint] = float(val)
+        return pose
+
+    def _draft_cmd(self, cmd: str, data: dict) -> tuple:
+        if cmd == "add_point":
+            if len(self.draft) >= MAX_DRAFT:
+                return False, f"szkic ma juz {MAX_DRAFT} punktow"
+            try:
+                pose = self.current_pose()
+                seconds = float(data.get("seconds", 1.5))
+            except (RuntimeError, TypeError, ValueError) as exc:
+                return False, str(exc)
+            if not 0.0 <= seconds <= 30.0:
+                return False, "czas dojazdu 0..30 s"
+            label = str(data.get("label") or f"wp{len(self.draft)}")[:40]
+            wp = Waypoint(label=label, pose=pose, seconds=seconds, check_gripper=bool(data.get("check_gripper")))
+            self.draft.append(wp)
+            return True, f"punkt {len(self.draft)}: {label}"
+        if cmd == "drop_point":
+            if not self.draft:
+                return False, "szkic pusty"
+            wp = self.draft.pop()
+            return True, f"usunieto '{wp.label}'"
+        if cmd == "clear_points":
+            self.draft = []
+            return True, "szkic wyczyszczony"
+        # save_motion
+        name = str(data.get("name") or "")
+        if not MOTION_NAME_RE.match(name):
+            return False, "nazwa: litery, cyfry, '-' i '_' (max 40)"
+        if not self.draft:
+            return False, "szkic pusty - najpierw dodaj punkty"
+        path = motion_path(self.cfg.arm.motions_dir, name)
+        if os.path.exists(path) and not data.get("overwrite"):
+            return False, f"ruch '{name}' juz istnieje (zaznacz nadpisanie)"
+        motion = Motion(name=name, waypoints=list(self.draft), note=str(data.get("note") or "")[:300])
+        try:
+            save_motion(self.cfg.arm.motions_dir, motion)
+        except OSError as exc:
+            return False, f"zapis nieudany: {exc}"
+        self.draft = []
+        log.info("zapisano ruch %s (%d punktow)", path, len(motion.waypoints))
+        return True, f"zapisano motions/{name}.json ({len(motion.waypoints)} punktow)"
+
     # --- stan dla przegladarki --------------------------------------------
 
     def snapshot(self) -> dict:
         sent = dict(self.arm.last_sent)  # kopia: watek roboczy dopisuje bez blokady
+        draft = [
+            {"label": wp.label, "seconds": wp.seconds, "check_gripper": wp.check_gripper,
+             "pose": {j: round(v, 1) for j, v in wp.pose.items()}}
+            for wp in list(self.draft)
+        ]
         with self._lock:
             running = self._running.data if self._running else None
             return {
+                "draft": draft,
                 "positions": {j: round(v, 2) for j, v in self.positions.items()},
                 "setpoint": {j: round(v, 2) for j, v in sent.items()},
                 "limits": {j: [round(lo, 1), round(hi, 1)] for j, (lo, hi) in self.limits.items()},
