@@ -48,6 +48,7 @@ from pinecone_bot.arm_panel import (  # noqa: E402
     limits_from_calibration,
 )
 from pinecone_bot.config import Config  # noqa: E402
+from pinecone_bot.kinematics import So101Kinematics  # noqa: E402
 
 STATIC = {
     "/": ("arm_panel.html", "text/html; charset=utf-8"),
@@ -186,7 +187,14 @@ def main() -> int:
     for joint, (lo, hi) in limits.items():
         print(f"  zakres {joint:14s} {lo:8.1f} .. {hi:8.1f}")
 
-    panel = ArmPanel(arm, cfg, limits, manual_only=args.no_home)
+    try:
+        kin = So101Kinematics(cfg.arm.urdf_path, cfg.arm.urdf_sign, cfg.arm.urdf_offset_deg)
+        print(f"jog XYZ: URDF {cfg.arm.urdf_path}, offsety {cfg.arm.urdf_offset_deg or 'brak (ZERO URDF w panelu)'}")
+    except Exception as exc:  # noqa: BLE001 - bez URDF panel dziala dalej, tylko bez jogu XYZ
+        kin = None
+        print(f"jog XYZ wylaczony: {exc}")
+
+    panel = ArmPanel(arm, cfg, limits, manual_only=args.no_home, kinematics=kin, config_path=Config.default_path())
     panel.start(home_first=True)
     if args.no_home:
         print("--no-home: ramie stoi, HOME wylaczone; jog od odczytanej pozycji; ruchy z motions/ bez powrotu do HOME")

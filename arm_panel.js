@@ -65,6 +65,9 @@
   .armp .armp-draft { font-size: 12px; margin: 6px 0 10px; font-variant-numeric: tabular-nums; }
   .armp .armp-draft div { padding: 2px 0; border-bottom: 1px solid var(--armp-border); }
   .armp .armp-warn { color: var(--armp-warn); font-size: 12px; margin-bottom: 8px; }
+  .armp .armp-xyzgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+  .armp .armp-xyzgrid button { height: 52px; font-weight: 700; }
+  .armp .armp-tcp { font-variant-numeric: tabular-nums; font-size: 14px; margin-bottom: 8px; }
   `;
 
   const OFFLINE = "Serwer ramienia nie działa (na Pi: python tools/arm_web.py)";
@@ -94,6 +97,23 @@
       <div class="armp-sec">
         <div class="armp-title">STAWY <span class="armp-muted">(zielony = odczyt z serw, niebieski = ostatnia komenda)</span></div>
         <div class="armp-joints"></div>
+      </div>
+      <div class="armp-sec armp-xyz" style="display:none">
+        <div class="armp-title">JOG XYZ <span class="armp-muted">(końcówka chwytaka, mm; pochylenie chwytaka bez zmian)</span></div>
+        <div class="armp-tcp">TCP: -</div>
+        <div class="armp-steps armp-xyzsteps"></div>
+        <div class="armp-xyzgrid">
+          <button data-ax="z" data-d="1">GÓRA</button>
+          <button data-ax="x" data-d="1">PRZÓD</button>
+          <button data-ax="y" data-d="1">LEWO</button>
+          <button data-ax="z" data-d="-1">DÓŁ</button>
+          <button data-ax="x" data-d="-1">TYŁ</button>
+          <button data-ax="y" data-d="-1">PRAWO</button>
+        </div>
+        <div class="armp-row" style="margin-top:8px">
+          <button class="armp-zero" data-always="1">ZERO URDF (ramię prosto, poziomo do przodu)</button>
+        </div>
+        <div class="armp-muted">Raz po kalibracji: ustaw stawami ramię wyprostowane poziomo do przodu, chwytak w linii, i kliknij ZERO URDF. Jeśli GÓRA jedzie w dół albo w bok, zmień znak stawu w pinecone_config.json (arm.urdf_sign).</div>
       </div>
       <div class="armp-sec armp-poses">
         <div class="armp-title">POZYCJE</div>
@@ -140,9 +160,12 @@
       steps: q(".armp-steps"), joints: q(".armp-joints"), motions: q(".armp-motions"),
       draft: q(".armp-draft"), label: q(".armp-label"), secs: q(".armp-secs"), check: q(".armp-check"),
       mname: q(".armp-mname"), over: q(".armp-over"), motWarn: q(".armp-mot-warn"),
+      xyz: q(".armp-xyz"), xyzSteps: q(".armp-xyzsteps"), tcp: q(".armp-tcp"),
     };
     const marks = {};  // joint -> {v, p, s, lo, hi}
     let step = 5;
+    let xyzStep = 10;
+    let xyzBuilt = false;
     let built = false;
     let motionsKey = "";
     let draftKey = "";
@@ -186,6 +209,26 @@
         };
         el.steps.appendChild(b);
       }
+    }
+
+    function buildXyz(steps) {
+      el.xyz.style.display = "";
+      el.xyzSteps.textContent = "";
+      for (const s of steps) {
+        const b = document.createElement("button");
+        b.textContent = s + " mm";
+        b.dataset.step = s;
+        b.dataset.always = "1";
+        if (s === xyzStep) b.classList.add("sel");
+        b.onclick = () => {
+          xyzStep = s;
+          for (const x of el.xyzSteps.children) x.classList.toggle("sel", Number(x.dataset.step) === xyzStep);
+        };
+        el.xyzSteps.appendChild(b);
+      }
+      el.xyz.querySelectorAll("[data-ax]").forEach((b) => {
+        b.onclick = () => send({ cmd: "jog_xyz", axis: b.dataset.ax, step_mm: Number(b.dataset.d) * xyzStep });
+      });
     }
 
     function buildJoints(joints) {
@@ -244,6 +287,7 @@
     function busyText(b) {
       if (b.cmd === "jog") return `ruch: ${b.joint} ${b.step > 0 ? "+" : ""}${b.step}`;
       if (b.cmd === "motion") return `ruch: ${b.name}`;
+      if (b.cmd === "jog_xyz") return `ruch: TCP ${b.axis} ${b.step_mm > 0 ? "+" : ""}${b.step_mm} mm`;
       return "ruch: " + b.cmd;
     }
 
@@ -259,6 +303,8 @@
         buildJoints(s.joints);
         built = true;
       }
+      if (!xyzBuilt && s.xyz_steps && s.xyz_steps.length) { buildXyz(s.xyz_steps); xyzBuilt = true; }
+      if (s.tcp) el.tcp.textContent = `TCP: x ${s.tcp.x} y ${s.tcp.y} z ${s.tcp.z} mm, pochylenie ${s.tcp.pitch}°`;
       const key = s.motions.join(",");
       if (key !== motionsKey) { buildMotions(s.motions); motionsKey = key; lastMotions = s.motions.slice(); }
       const dkey = JSON.stringify(s.draft || []);
@@ -316,6 +362,9 @@
         check_gripper: el.check.checked,
       }, true);
       if (ok) { el.label.value = ""; el.check.checked = false; }
+    };
+    q(".armp-zero").onclick = () => {
+      if (window.confirm("Ramię stoi wyprostowane poziomo do przodu? Obecny odczyt stanie się zerem URDF.")) send({ cmd: "urdf_zero" }, true);
     };
     q(".armp-drop").onclick = () => send({ cmd: "drop_point" }, true);
     q(".armp-clear").onclick = () => {
