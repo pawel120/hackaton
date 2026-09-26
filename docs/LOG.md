@@ -587,3 +587,9 @@ Panel jazdy i ramienia w jednym miejscu: UI ramienia w `arm_panel.js`, montowane
 **Nie dziala / otwarte:** skoki opoznien hotspotu dalej zatrzymuja robota na chwile (tak ma byc przy utracie lacza > 1 s). Do sprawdzenia oszczedzanie energii WiFi na Pi (brak `iw` w systemie). `shoulder_lift` do ustawienia recznie / kalibracja pod kamere na ramieniu.
 **Nastepny krok:** restart obu serwerow na Pi z nowym kodem (ramie trzymane - connect zdejmuje na chwile torque); test jazdy W.
 **Sprzet:** dotkniety (Pi: serwery paneli; ramie i baza nie ruszane przez Claude)
+
+## 2026-09-26 - pawel120 (Claude) - poradnik odpalania panelu (docs/PANEL.md)
+**Zrobione:** Polaczenie z Pi krok po kroku i odpalenie paneli spisane w `docs/PANEL.md` (hotspot iPhone / kabel, szukanie IP, dwa terminale SSH: `web_control.py` + `tools/arm_web.py`, przegladarka, konczenie pracy, tabela bledow z dzisiejszej sesji). Link w README, notka w `docs/SETUP.md`, ze WiFi na Pi juz dziala. Na Pi: 136 testow zielonych, `./arm.sh status` OK.
+**Nie dziala / otwarte:** `robot-web.service` nie zainstalowany (brak autostartu). Na Pi lezy `tests/test_calibrate_target.py` z niezmergowanego brancha `claude/robot-pinecone-test-plan-e4ca8e` (6 bledow, pomijac `--ignore`). `push_to_pi.sh` bez rsync nie usuwa starych plikow.
+**Nastepny krok:** zainstalowac autostart (`deploy/setup_pi.sh` krok 7) albo zostac przy recznym starcie w tmux.
+**Sprzet:** dotkniety (Pi: SSH, testy, start paneli przez uzytkownika; Claude tylko odczyt stanu)
