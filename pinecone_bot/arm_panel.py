@@ -82,9 +82,9 @@ MOTION_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
 RAW_RESOLUTION = 4095         # STS3215: 4096 krokow, lerobot dzieli przez (4096 - 1)
 
 # Maksymalna zmiana celu na jeden tick (stopnie; gripper w jednostkach 0-100).
-# Przy rate_hz=25: 50 st/s dla przegubow, 100 j/s dla chwytaka.
-DEFAULT_MAX_STEP = {j: 2.0 for j in JOINT_NAMES}
-DEFAULT_MAX_STEP["gripper"] = 4.0
+# Przy rate_hz=25: 25 st/s dla przegubow, 50 j/s dla chwytaka (polowa wartosci z 2026-09-26 rano).
+DEFAULT_MAX_STEP = {j: 1.0 for j in JOINT_NAMES}
+DEFAULT_MAX_STEP["gripper"] = 2.0
 
 
 class Stopped(Exception):

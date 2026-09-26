@@ -500,3 +500,9 @@ def test_jog_back_into_range_allowed_when_slightly_outside():
     panel.process_one()
     assert panel.last_error is None
     assert lo <= arm.pose["wrist_roll"] <= lo + 5.0
+def test_default_speed_is_halved():
+    # 2026-09-26: po wjechaniu robota w ramie predkosc panelu zmniejszona o polowe
+    from pinecone_bot.arm_panel import DEFAULT_MAX_STEP
+
+    assert all(DEFAULT_MAX_STEP[j] == 1.0 for j in JOINT_NAMES if j != "gripper")
+    assert DEFAULT_MAX_STEP["gripper"] == 2.0
