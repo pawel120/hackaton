@@ -562,3 +562,9 @@ Pytania do uzytkownika na starcie nastepnej sesji (nie zgaduj):
 **Nie dziala / otwarte:** SSH po WiFi zawieszalo sie (kex zrywany) po kilku ubitych sesjach, pomogl restart Pi. Blad `Couldn't resolve requests` = kamera zajeta przez stary proces, nie brak trybu (424x240@30 wspierane, USB3). `lsusb` mowi D435, docs D415.
 **Nastepny krok:** przestawic kamere wyzej (STATUS krok 1); jesli glebia dalej slaba, sprobowac `--depth-res 480x270`.
 **Sprzet:** dotkniety (kamera, restart Pi)
+
+## 2026-09-26 - pawel120 (Claude) - kalibracja HSV na szyszkach
+**Zrobione:** klatki z Pi (`snap_frames.py`): tla wewnatrz, sama sztuczna trawa, 3 szyszki na trawie. Przeszukanie progow HSV -> lo [130,35,30], hi [179,100,125], min_area 120. Wynik: 3/3 szyszki po ustaleniu AWB, 0 falszywych na trawie, 22 na dywanach. Commit teleop_mirror.py + heartbeat 1.0 s.
+**Nie dziala / otwarte:** AWB kamery zmienia kolory przez ~1 s po starcie. Progi z jednej sceny i jednego swiatla. Hue szyszek zawija sie przez 0/180, detektor ma jeden zakres H (uzyty 130-179). Robot piszczal (plyta hovera?), przyczyna nieznana.
+**Nastepny krok:** klatki w innym swietle; zablokowac AWB/ekspozycje w camera.py.
+**Sprzet:** dotkniety (kamera)

@@ -14,11 +14,13 @@ zadania i przypisania na tablicy Projects (link nizej). Czego nie ma tutaj albo 
 - Kamera D415: podglad `rs_mjpeg_server.py` (glebia 424x240 -> mniejszy MinZ, bliski dywan ma ciagla glebie), detekcja szyszek z glebi (`scan_cones.py`, rozrzut < 2 mm).
 - Nowy stos `pinecone_bot` (PR #14 + poprawki PR #16): symulacja na laptopie zbiera 5/5 szyszek, 66 testow zielonych.
   Ramie odtwarza nagrane punkty, baza ustawia szyszke z obrazu, maszyna stanow, szukanie pasami. Bez IK, bez ML.
+- Detektor HSV dostrojony na prawdziwych szyszkach na sztucznej trawie (lo [130,35,30], hi [179,100,125], min_area 120): 3/3 szyszki, 0 falszywych na trawie.
 - `motions/grasp_mid.json`: chwyt z `demo2_fixed.csv` (aktualna kalibracja). `home.json`, `drop_box.json` (placeholder).
 
 ## Nie dziala / nie sprawdzone
 
 - `pinecone_bot` NIE JECHAL jeszcze na sprzecie. Wszystko ponizej to pierwsze uruchomienie (docs/RUNBOOK.md).
+- HSV sprawdzone w jednym swietle; auto white balance kamery przez ~1 s po starcie daje zielona trawe i 0 detekcji (zablokowac AWB/ekspozycje w camera.py).
 - `lsusb` zglasza kamere jako D435 (8086:0b07), docs mowia D415 - sprawdzic model.
 - Kamera stoi za nisko: miejsce chwytu (17 cm przed kamera) jest w martwej strefie glebi (~31 cm). Trzeba przestawic.
 - Chwyty `grasp_near`, `grasp_far`, `drop_box` nie nagrane (config ma na razie tylko `grasp_mid`).
