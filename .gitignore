@@ -9,3 +9,6 @@ cel.json
 runs/
 pinecone_log.csv
 frames/
+
+# klatki z tools/snap_frames.py
+frames*/
