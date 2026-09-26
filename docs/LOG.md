@@ -660,3 +660,8 @@ Panel jazdy i ramienia w jednym miejscu: UI ramienia w `arm_panel.js`, montowane
   nagrac `drop_box` (`tools/record_motion.py --name drop_box`), dopisac chwyty do `cfg.grasps`,
   `tools/calibrate_target.py`; potem `tools/base_test.py`, `--dry-run`, `--real` z wylacznikiem.
 **Sprzet:** dotkniety (tylko odczyt kamery i plik configu na Pi; ramie i baza nie ruszane)
+## 2026-09-26 - pawel120 (Claude) - podglad glebi jak RealSense Viewer
+**Zrobione:** Uzytkownik: glebia w `rs_mjpeg_server.py` "zupelnie inna niz w RealSense Viewer". Klatka ze strumienia: dane glebi ciagle (podloga bez dziur, szyszki widoczne jako slabe wybrzuszenia), winna skala liniowa 0-1500 mm - podloga to jeden gradient, szyszki (kilka cm) nie odrozniaja sie. Domyslnie teraz `rs.colorizer` (Jet z wyrownaniem histogramu, brak danych = czarny, jak w Viewerze); stara skala pod `--colormap fixed`. Podglad uruchomiony na Pi (:8080), D435 na USB3, zasilanie bez throttlingu.
+**Nie dziala / otwarte:** nowa wersja nie wdrozona na Pi (sesja nie miala zgody na zapis na Pi). Viewer ma tez filtry (spatial/temporal) i domyslnie 848x480 - tu ich nie ma.
+**Nastepny krok:** scp `rs_mjpeg_server.py` na Pi, restart podgladu, porownac z Viewerem. Jesli szyszki dalej slabo widac: kolor = wysokosc nad plaszczyzna podlogi (jak w `scan_cones.py`).
+**Sprzet:** nie (tylko odczyt kamery)
