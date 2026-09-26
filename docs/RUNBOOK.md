@@ -4,6 +4,57 @@ Krok po kroku na dzien ze sprzetem. Stan projektu jest w `docs/STATUS.md`, setup
 pulapki sprzetowe w `docs/HARDWARE.md`. Ten plik opisuje stos `pinecone_bot`; stary panel webowy
 do recznej jazdy odpala sie osobno (`python web_control.py`).
 
+## Dzien zbierania: pierwszy `--real` krok po kroku (2026-09-26)
+
+Kamera jest na maszcie, ramie podlaczone, HSV dostrojone. Zostaly pomiary, ktore lacza te trzy rzeczy.
+Wszystko ponizej dzieje sie na Pi przez SSH (Pi OS Lite, brak pulpitu: NIE uzywac `--show` ani okien OpenCV;
+`calibrate_target.py` ma do tego `--headless`). Czlowiek z wylacznikiem przy robocie przez caly czas.
+
+Config `pinecone_config.json` ma profil na pierwszy test: `search_pattern: spin_drive` (obrot w miejscu,
+kawalek prosto, od nowa), `search_timeout_s: 30` (po 30 s bez szyszki DONE), `retries: 1`, `camera.lock_auto: true`
+(AWB zamrozone po rozgrzewce). Pasy kosiarki (`lanes`) wracaja na demo.
+
+0. **Porty i procesy.** `--real` sam otwiera kamere, `/dev/robot-drive` i `/dev/robot-arm`, wiec panele musza stac:
+   `fuser -k 8000/tcp 8010/tcp 8080/tcp` (web_control, arm_web, rs_mjpeg_server; NIE `pkill -f`, pulapka 31).
+   Zamkniecie `arm_web.py` zdejmuje torque - ktos trzyma ramie. Kod z mastera: `deploy/push_to_pi.sh`,
+   na Pi `python -m pytest tests -q`.
+1. **Baza (2 min, bez kamery).** `python tools/base_test.py --driver xiao --port /dev/robot-drive turn --seconds 2 --w 0.4`:
+   ma skrecic W LEWO, jesli w prawo -> `control.steer_sign: -1`. Potem `forward --seconds 2 --v 0.15` z miarka;
+   jesli robot jedzie wyraznie szybciej/wolniej niz 0.15 m/s, popraw `base.xiao_pwm_max` (patrz "Na Raspberry Pi", pkt 7).
+   Na pierwszy test wystarczy zgodnosc znaku i "nie za szybko".
+2. **Ramie (bez bazy).** `python tools/arm_play.py --motion home --dry-run`, potem bez `--dry-run` (reka na wylaczniku).
+   Nastepnie `python tools/arm_play.py --motion grasp_mid` z szyszka 17 cm przed chwytakiem (pan -13.6 st, ok. 6 cm w lewo od osi):
+   w logu ma byc "chwytak trzyma (odczyt > 6)". Zaznacz tasma miejsce, w ktorym szyszka lezala - to jest punkt chwytu.
+   `drop_box.json` to placeholder (pan +90 w lewo na wysokosci home, otworz, wroc): `--motion drop_box --dry-run`,
+   sprawdz, czy po lewej nie ma masztu/kabla, potem na zywo z szyszka w chwytaku. Jesli tor koliduje, nagraj wlasny:
+   `python tools/record_waypoints.py --name drop_box --note "..."`.
+3. **Kamera widzi punkt chwytu?** `python rs_mjpeg_server.py`, podglad `http://192.168.137.5:8080/`: szyszka na tasmie
+   z pkt 2 ma byc w kadrze, cala, w dolnej polowie obrazu. Nie ma jej -> kamera nizej/bardziej w dol
+   (`python tools/camera_geometry.py`). Wylacz serwer (`fuser -k 8080/tcp`), kamera musi byc wolna.
+4. **Kalibracja celu (headless).** Szyszka DOKLADNIE na tasmie z pkt 2, nic innego brazowego w kadrze:
+   `python tools/calibrate_target.py --headless` (sam pomiar: px, py, rozrzut). Rozrzut < 2 px? Zapisz:
+   `python tools/calibrate_target.py --headless --grasp grasp_mid --set-cx --write`
+   (`target_row` = wiersz szyszki, `cx` = jej kolumna; chwyt jest z boku osi, wiec `cx` NIE musi byc 320).
+5. **Dry-run z prawdziwa kamera** (`python -m pinecone_bot.main --dry-run --seconds 120`): baza i ramie tylko drukuja.
+   Przesuwaj szyszke reka i czytaj:
+   - szyszka na lewo od `cx` -> `w` dodatnie; na prawo -> ujemne;
+   - szyszka wyzej w obrazie niz `target_row` (dalej) -> `v` dodatnie; nizej (za blisko) -> `v` ujemne (cofanie);
+   - szyszka na tasmie -> po ~3 klatkach `APPROACH -> ALIGN -> GRASP` i `arm: replay(grasp_mid)`, potem `replay(drop_box)`;
+   - brak szyszki -> SEARCH drukuje `w=+0.35` (obrot), po 30 s DONE.
+   Jesli znak `w` jest odwrotny do oczekiwanego, to blad kierunku kamery/`cx`, nie bazy - baza sprawdzona w pkt 1.
+6. **`--real`, cztery testy, rosnaca trudnosc** (`python -m pinecone_bot.main --real --seconds 120`, po kazdym
+   `cp pinecone_log.csv logs/test_N.csv`):
+   1. szyszka na tasmie, robot stoi: sprawdza GRASP i DROP, baza prawie sie nie rusza;
+   2. szyszka 0.8 m przed robotem, 20 cm w bok: sprawdza APPROACH/ALIGN (jedzie, staje, podnosi);
+   3. szyszka poza kadrem, z boku: sprawdza SEARCH (obrot, potem podjazd);
+   4. trzy szyszki w promieniu 1.5 m.
+   Robot jedzie w zla strone albo nie hamuje -> wylacznik, Ctrl+C (zatrzymuje baze, ramie zostaje z torque do `close()`).
+7. **Wynik do `docs/STATUS.md` i `docs/LOG.md`**: ktore z 4 testow przeszly, wartosci `cx`/`target_row`, `err_x`/`err_y`
+   z CSV tuz przed GRASP przy nieudanych chwytach (sekcja "Strojenie" mowi, co z nimi zrobic).
+
+Symulacja `--sim` z tym configiem NIE widzi szyszek (progi HSV sa pod prawdziwe szyszki, symulator maluje domyslny braz);
+do sprawdzenia zmian w `brain.py` uzywaj `--sim` bez `--config`.
+
 ## Checklista na rano (pierwsze uruchomienie pinecone_bot na sprzecie)
 
 Kolejnosc ma znaczenie: kazdy krok zapisuje cos, z czego korzysta nastepny.

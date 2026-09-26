@@ -45,14 +45,14 @@
     "far_row_frac": 0.35,
     "far_creep_v": 0.1,
     "search_w": 0.35,
-    "search_pattern": "lanes",
+    "search_pattern": "spin_drive",
     "lane_length_m": 3.0,
     "lane_count": 4,
     "lane_spacing_m": 1.0,
     "search_drive_m": 0.8,
     "search_drive_v": 0.15,
-    "search_timeout_s": 90.0,
-    "retries": 2,
+    "search_timeout_s": 30.0,
+    "retries": 1,
     "retry_back_s": 1.2,
     "retry_back_v": -0.08,
     "loop_hz": 15.0,
@@ -81,7 +81,7 @@
   },
   "camera": {
     "warmup_frames": 45,
-    "lock_auto": false
+    "lock_auto": true
   },
   "sim": {
     "cam_height_m": 0.45,

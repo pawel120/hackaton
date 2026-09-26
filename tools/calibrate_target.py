@@ -15,9 +15,15 @@ Procedura:
     6. w zapisuje JSON konfiguracji. q wychodzi.
 
 Uzycie (z katalogu repo):
-    python tools/calibrate_target.py                      # RealSense
+    python tools/calibrate_target.py                      # RealSense, okno OpenCV
     python tools/calibrate_target.py --grasp grasp_near
     python tools/calibrate_target.py --source frames/     # na zapisanych klatkach
+
+Bez pulpitu (Pi OS Lite przez SSH - cv2.imshow nie dziala):
+    python tools/calibrate_target.py --headless                          # tylko pomiar, nic nie zapisuje
+    python tools/calibrate_target.py --headless --grasp grasp_mid --write --set-cx
+        -> target_row chwytu grasp_mid = srednia py, cx = srednia px, zapis do configu
+    python tools/calibrate_target.py --headless --set-cx --write         # tylko cx
 
 Zapisywana jest SREDNIA z ostatnich 15 klatek (px, py) najblizszej detekcji,
 nie jedna klatka - detekcja szumi o 1-2 px i to by sie przenioslo na dojazd.
@@ -51,6 +57,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--source", help="plik/katalog/wideo zamiast RealSense")
     p.add_argument("--config", help="sciezka do JSON konfiguracji")
     p.add_argument("--grasp", help="nazwa chwytu do kalibracji na start")
+    p.add_argument("--headless", action="store_true",
+                   help="bez okna: zmierz srednia z --frames klatek, wypisz i (z --write) zapisz")
+    p.add_argument("--frames", type=int, default=AVG_FRAMES,
+                   help=f"headless: ile kolejnych klatek z detekcja usrednic (domyslnie {AVG_FRAMES})")
+    p.add_argument("--write", action="store_true",
+                   help="headless: zapisz wynik do configu (target_row chwytu z --grasp i/lub cx z --set-cx)")
+    p.add_argument("--set-cx", action="store_true", help="headless: srednia kolumna szyszki -> cfg.cx")
     return p.parse_args()
 
 
@@ -68,6 +81,76 @@ def print_instructions(cfg: Config, cfg_path: str) -> None:
     print()
 
 
+def collect_average(cam, detector, n_frames: int, max_reads: int | None = None):
+    """
+    Srednia (px, py) z n_frames KOLEJNYCH klatek z detekcja (najblizsza szyszka = dets[0]).
+    Klatka bez detekcji zeruje serie, jak w trybie z oknem. Zwraca
+    (avg_px, avg_py, std_px, std_py, n) albo None, gdy w max_reads odczytach
+    (domyslnie 6 * n_frames) nie udalo sie zebrac serii.
+    """
+    if max_reads is None:
+        max_reads = 6 * n_frames
+    history: deque = deque(maxlen=n_frames)
+    for _ in range(max_reads):
+        try:
+            frame, _depth = cam.read()
+        except EOFError:
+            break
+        dets = detector.detect(frame)
+        if dets:
+            history.append((dets[0].px, dets[0].py))
+        else:
+            history.clear()
+        if len(history) >= n_frames:
+            arr = np.array(history)
+            return (float(arr[:, 0].mean()), float(arr[:, 1].mean()),
+                    float(arr[:, 0].std()), float(arr[:, 1].std()), len(history))
+    return None
+
+
+def apply_measurement(cfg: Config, avg_px: float, avg_py: float,
+                      grasp_name: str | None, set_cx: bool) -> list[str]:
+    """Wpisz pomiar do configu (bez zapisu na dysk). Zwraca opisy zmian."""
+    changes: list[str] = []
+    if grasp_name:
+        names = [g.name for g in cfg.grasps]
+        if grasp_name not in names:
+            raise SystemExit(f"Nie ma chwytu {grasp_name!r}; sa: {names}")
+        g = cfg.grasps[names.index(grasp_name)]
+        g.target_row = round(avg_py, 1)
+        changes.append(f"{g.name}.target_row = {g.target_row:.1f}")
+    if set_cx:
+        cfg.cx = round(avg_px, 1)
+        changes.append(f"cx = {cfg.cx:.1f}")
+    return changes
+
+
+def run_headless(args, cfg: Config, cfg_path: str) -> int:
+    if args.write and not (args.grasp or args.set_cx):
+        raise SystemExit("--write wymaga --grasp NAME i/lub --set-cx (co zapisac?).")
+    detector = HsvConeDetector(cfg.detector)
+    cam = make_camera(cfg, args.source)
+    try:
+        print(f"headless: zbieram {args.frames} kolejnych klatek z detekcja...")
+        res = collect_average(cam, detector, args.frames)
+    finally:
+        cam.close()
+    if res is None:
+        print("Brak stabilnej detekcji (szyszka nie w kadrze albo prog HSV nie pasuje). Nic nie zapisano.")
+        return 1
+    avg_px, avg_py, std_px, std_py, n = res
+    print(f"srednia z {n} klatek: px={avg_px:.1f} py={avg_py:.1f}  (std {std_px:.1f}/{std_py:.1f})")
+    print(f"config teraz: cx={cfg.cx:.1f} "
+          + " ".join(f"{g.name}={g.target_row:.1f}" for g in cfg.grasps))
+    if not args.write:
+        print("Bez --write: nic nie zapisano. Dodaj --grasp NAME --write i/lub --set-cx --write.")
+        return 0
+    changes = apply_measurement(cfg, avg_px, avg_py, args.grasp, args.set_cx)
+    path = cfg.save(cfg_path)
+    print(f"Zapisano {path}: " + ", ".join(changes))
+    return 0
+
+
 def main() -> None:
     args = parse_args()
     cfg_path = args.config or Config.default_path()
@@ -81,6 +164,9 @@ def main() -> None:
         if args.grasp not in names:
             raise SystemExit(f"Nie ma chwytu {args.grasp!r}; sa: {names}")
         selected = names.index(args.grasp)
+
+    if args.headless:
+        raise SystemExit(run_headless(args, cfg, cfg_path))
 
     print_instructions(cfg, cfg_path)
 

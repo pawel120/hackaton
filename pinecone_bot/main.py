@@ -10,6 +10,7 @@ Kolejnosc na sprzecie: tools/calibrate_hsv.py -> tools/calibrate_target.py -> to
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 
 from .brain import Brain, WallClock
@@ -128,7 +129,16 @@ def run_real(args, dry: bool) -> int:
     return 0
 
 
+def setup_logging(level: int = logging.INFO) -> None:
+    """
+    Bez tego log.info z arm.py (odczyt chwytaka, 'chwytak PUSTY', kolejne waypointy) i camera.py
+    (blokada AWB) nie trafia nigdzie - a na Pi przez SSH to jedyny podglad, co robi ramie.
+    """
+    logging.basicConfig(level=level, format="%(asctime)s %(name)s: %(message)s", datefmt="%H:%M:%S", force=True)
+
+
 def main(argv=None) -> int:
+    setup_logging()
     p = argparse.ArgumentParser(description="zbieracz szyszek")
     mode = p.add_mutually_exclusive_group(required=True)
     mode.add_argument("--sim", action="store_true")
