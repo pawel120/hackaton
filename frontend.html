@@ -204,7 +204,17 @@
     <div class="hint">nagraj jadąc na WASD, potem odtwórz jako kolejny tryb auto. Odtwarzanie kończy się i wraca do manuala samo.</div>
   </div>
 
+  <div class="panel">
+    <div class="panel-title">RAMIĘ SO-101</div>
+    <div class="hint" style="text-align:left; margin: -6px 0 12px;">osobny serwer na Pi: python tools/arm_web.py (port 8010). Główny STOP zatrzymuje też ramię.</div>
+    <div id="arm-root"></div>
+  </div>
+
+<script src="arm_panel.js"></script>
 <script>
+// Ramie: osobny proces (tools/arm_web.py, :8010), zeby blad magistrali serw nie zatrzymal jazdy.
+const armPanel = mountArmPanel(document.getElementById('arm-root'), { base: `http://${location.hostname}:8010` });
+
 const WS_URL = `ws://${location.hostname}:8765`;
 let ws = null;
 let mode = 'manual';
@@ -375,6 +385,7 @@ for (const el of paramEls) {
 }
 
 document.getElementById('stop-btn').addEventListener('click', () => {
+  armPanel.stop();
   for (const k of Object.keys(keys)) keys[k] = false;
   if (isRecording) {
     ws.send(JSON.stringify({ type: 'stop_record', name: recordNameInput.value }));

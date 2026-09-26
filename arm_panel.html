@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ramię SO-101</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    background: #0f1115;
+    color: #e6e8eb;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 120px;
+    min-height: 100vh;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 16px; color: #8a8f98; }
+  .panel { background: #171a21; border-radius: 12px; padding: 16px; width: 100%; max-width: 520px; }
+</style>
+</head>
+<body>
+  <h1>Ramię SO-101 - sterowanie ręczne</h1>
+  <div class="panel" id="arm-root"></div>
+  <div style="margin-top: 12px; font-size: 12px; color: #8a8f98;">
+    Jazda i ramię razem: panel jazdy na porcie 8000 (web_control.py).
+  </div>
+  <script src="arm_panel.js"></script>
+  <script>
+    mountArmPanel(document.getElementById("arm-root"), { base: "", stickyStop: true, keyboardStop: true });
+  </script>
+</body>
+</html>
