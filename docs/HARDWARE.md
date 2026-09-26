@@ -284,3 +284,20 @@ dziala stabilnie. Szczegoly i decyzje - patrz issue #8.
     KAZDEJ zmianie trybu** (`set_mode`), nie tylko przy naturalnym
     zakonczeniu odtwarzania - inaczej UI panelu pokazuje "duchy"
     poprzedniego stanu.
+
+34. **`pinecone_config.json` jest w gicie, a `deploy/push_to_pi.sh` go
+    NADPISUJE na Pi przy kazdym pushu.** Wartosc zmierzona i wpisana
+    recznie na sprzecie (np. nowy prog HSV) przetrwa tylko do
+    nastepnego pushu, jesli nie trafi do repo (commit/PR) - inaczej push
+    przywraca stara wersje z brancha/mastera i pomiar przepada. Tak
+    stracono raz wpisany na Pi prog HSV i sekcje "camera". Wartosci
+    zmierzone na sprzecie wpisywac do configu W REPO, nie tylko lokalnie
+    na Pi.
+
+35. **Sesja tmux odpalona z NIEINTERAKTYWNEGO polaczenia ssh na Pi
+    ginie po rozlaczeniu ssh** - nawet z `nohup`/`setsid` przezyla tylko
+    jedno rozlaczenie, przy drugim zniknela. Interaktywne narzedzia
+    ramienia (np. `tools/record_motion.py`, `tools/arm_play.py`)
+    odpalac we WLASNYM terminalu operatora, interaktywnie:
+    `ssh -t robot@<ip> "cd ~/hackaton && .venv/bin/python tools/..."`,
+    nie z automatycznej (nieinteraktywnej) sesji.

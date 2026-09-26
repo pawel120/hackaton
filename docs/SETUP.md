@@ -66,10 +66,32 @@ od nowa tylko `opencv-python`.
 - Kabel ethernet laptop<->Pi (adapter USB-Ethernet w laptopie). Pi ma
   **statyczne IP `192.168.137.5`** (ustawione przez `nmcli` na "Wired
   connection 1"), laptop `192.168.137.1` (Windows ICS - Internet
-  Connection Sharing).
+  Connection Sharing). ICS jest przypisane do KONKRETNEGO adaptera -
+  jesli kabel wpiniesz w inny port (np. wbudowany Realtek zamiast
+  adaptera USB-Ethernet), `192.168.137.5` nie odpowie. Przy zmianie
+  portu przelacz ICS na ten adapter albo nadaj laptopowi recznie
+  `192.168.137.1` na nowym porcie.
+- WiFi na Pi DZIALA (wczesniej ten plik mowil, ze nie): Pi laczy sie z
+  hotspotem "iPhone pawel" jako `wlan0`, adres `172.20.10.4` (DHCP -
+  adres moze sie zmienic przy kolejnym polaczeniu). `ssh robot@172.20.10.4`,
+  ping po WiFi 11-109 ms. `robot.local` (mDNS) dziala w git-bash tak samo
+  jak dla adresu kablowego. Laptop moze SAM przelaczyc WiFi na inna znana
+  siec (zdarzylo sie na "hacker-bloc", tylko IPv6) i zgubic polaczenie z
+  Pi - sprawdz, do jakiej sieci laptop jest podlaczony, zanim szukasz
+  problemu gdzie indziej (ten sam objaw daje odpiety kabel ethernet).
 - `ssh robot@192.168.137.5` - user `robot`, haslo znasz (nie w tym
   pliku). `robot.local` (mDNS) dziala z git-bash, ale NIE z PowerShell -
   w PowerShell uzywaj IP wprost.
+- Interaktywne narzedzia ramienia (np. `tools/record_motion.py`,
+  `tools/arm_play.py`) odpalaj we WLASNYM terminalu operatora,
+  interaktywnie: `ssh -t robot@<ip> "cd ~/hackaton && .venv/bin/python
+  tools/..."`. Sesja tmux/nohup odpalona z nieinteraktywnego ssh (np. z
+  sesji Claude) ginie po rozlaczeniu - patrz docs/HARDWARE.md.
+- Sesje Claude nie moga kopiowac plikow kodu na Pi (blokada trybu auto
+  "Remote Shell Writes") - config JSON idzie przez `python` heredoc po
+  ssh, ale pliki `.py` musi skopiowac operator sam, np.
+  `scp tools\record_motion.py robot@172.20.10.4:~/hackaton/tools/` (z
+  cmd na laptopie).
 - Pliki z laptopa na Pi: `scp plik.py robot@192.168.137.5:~/hackaton/`
   - **w PowerShell na laptopie, NIE z wnetrza sesji SSH na Pi** (Pi nie
   ma internetu, wiec `scp`/`git pull` z Pi w strone swiata nie zadziala
@@ -82,10 +104,12 @@ od nowa tylko `opencv-python`.
   PI_HOST=robot@192.168.137.5 bash deploy/push_to_pi.sh
   ```
 
-- **WiFi na Pi NIE dziala** (handshake WPA do hotspotu iPhone pada,
-  profile WiFi zostaly usuniete) - Pi nie ma internetu. Stad `git pull`
-  na Pi nie dziala - wszystkie pliki ida przez `scp`/`push_to_pi.sh` z
-  laptopa.
+  **Uwaga:** `pinecone_config.json` jest sledzony w gicie i ten skrypt go
+  NADPISUJE na Pi przy kazdym pushu - wartosci zmierzone na sprzecie
+  musza wejsc do configu W REPO (commit/PR), inaczej gina przy nastepnym
+  pushu (patrz docs/HARDWARE.md, ostatnia pulapka). Internet na Pi (i
+  `git pull`) nie jest potwierdzony - wszystkie pliki nadal ida przez
+  `scp`/`push_to_pi.sh` z laptopa.
 
 ### Instalacja od zera: `deploy/setup_pi.sh`
 
