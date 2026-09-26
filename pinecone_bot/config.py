@@ -101,6 +101,17 @@ class ArmConfig:
 
 
 @dataclass
+class CameraConfig:
+    """Start kamery RealSense (kolor)."""
+    # Klatki odrzucane po starcie (30 fps). Auto white balance D4xx ustala sie ~1 s;
+    # przy 15 klatkach (0.5 s) trawa byla jeszcze zielona i prog HSV nie lapal szyszek.
+    warmup_frames: int = 45
+    # True: po rozgrzewce zamroz AWB i auto-ekspozycje na biezacych wartosciach,
+    # zeby kolory nie plywaly. Minus: przy duzej zmianie swiatla obraz za ciemny/jasny.
+    lock_auto: bool = False
+
+
+@dataclass
 class SimConfig:
     """Geometria kamery i swiata dla symulatora (i do zgrubnej kalibracji na sucho)."""
     cam_height_m: float = 0.45
@@ -129,6 +140,7 @@ class Config:
     control: ControlConfig = field(default_factory=ControlConfig)
     base: BaseConfig = field(default_factory=BaseConfig)
     arm: ArmConfig = field(default_factory=ArmConfig)
+    camera: CameraConfig = field(default_factory=CameraConfig)
     sim: SimConfig = field(default_factory=SimConfig)
     log_csv: str = "pinecone_log.csv"
 

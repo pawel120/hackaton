@@ -79,6 +79,10 @@
     "subprocess_cmd": "python legacy/arm_recordings/replay_demo.py --port {port}",
     "empty_gripper_below": 6.0
   },
+  "camera": {
+    "warmup_frames": 45,
+    "lock_auto": false
+  },
   "sim": {
     "cam_height_m": 0.45,
     "cam_pitch_deg": 38.0,
