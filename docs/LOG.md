@@ -614,3 +614,8 @@ test `tests/test_web_control_coverage.py` (websockets podstawiony stubem, bo nie
 **Nastepny krok:** na trawie nastroic `cov_turn_seconds` do 90 st, potem dlugosc pasa i odstep; zmierzone
 predkosci przepisac do `search_drive_v` / `search_w` w `pinecone_config.json`.
 **Sprzet:** nie
+## 2026-09-26 - pawel120 (Claude) - wylacznik STOP na telefon
+**Zrobione:** Strona `/stop` (`stop.html`) w `web_control.py`: jeden duzy przycisk na caly ekran telefonu (pointerdown, bez przewijania). POST `/api/estop` zatrzaskuje STOP: petla sterowania co tick robi `hard_stop()` (zero bez rampy, tryb manual, koniec sekwencji/nagrywania, klawisze zerowane), `start_sequence` odmawia; watek wysyla STOP do ramienia (:8010). ODBLOKUJ (`/api/estop_release`) wymaga numeru zatrzasku - spozniony ODBLOKUJ nie zdejmie nowszego STOP. HTTP zamiast WebSocket celowo: /stop nie jest heartbeatem operatora, wiec telefon z ta strona nie trzyma robota przy zyciu po utracie panelu jazdy. Strona ponawia STOP do potwierdzenia, pokazuje lacze w ms i "BRAK LACZA" po 2 s. Panel jazdy pokazuje stan E-STOP i link do /stop. `tests/test_web_control_estop.py` (8), razem 163 zielone. Sprawdzone w przegladarce (widok telefonu) na `web_control.py` bez Xiao: zatrzask blokuje W, po ODBLOKUJ jedzie, STOP w trakcie jazdy zeruje.
+**Nie dziala / otwarte:** nie wdrozone na Pi. Zatrzask dotyczy jazdy; panel ramienia dostaje jeden STOP, jog ramienia dalej mozliwy. Przy duzym lagu hotspotu STOP tez dojdzie pozno.
+**Nastepny krok:** skopiowac `web_control.py`, `stop.html`, `frontend.html` na Pi, restart `web_control.py`, test STOP z telefonu przy jadacym robocie (kola w powietrzu).
+**Sprzet:** nie

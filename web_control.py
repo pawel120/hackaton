@@ -25,6 +25,13 @@ order by pinecone_bot/sequence.py in mode "sequence". Arm steps go to the
 arm panel server (tools/arm_web.py, ROBOT_ARM_PANEL, default
 http://127.0.0.1:8010) over HTTP; a lost heartbeat, STOP or any mode change
 aborts the sequence, zeroes the drive and sends STOP to the arm.
+
+Phone e-stop: http://<robot-ip>:8000/stop (stop.html) is one big STOP button.
+It talks plain HTTP (POST /api/estop), not the WebSocket, so it never counts as
+an operator heartbeat: a phone left on that page cannot keep the robot alive
+after the driving browser drops. The stop latches: drive stays at zero (keys,
+modes and sequences ignored) until someone presses ODBLOKUJ on /stop. The
+release carries the latch number, so a delayed release cannot undo a newer STOP.
 """
 
 import asyncio
@@ -220,12 +227,47 @@ class RobotState:
         )
         self.seq_error = None  # ostatni blad zapisu/uruchomienia (dla przegladarki)
 
+        # wylacznik z telefonu (/stop): zatrzask + numer, zeby spozniony ODBLOKUJ nie zdjal nowszego STOP
+        self.estop_latched = False
+        self.estop_id = 0
+
+    def estop(self):
+        """STOP z /stop (watek HTTP). Petla sterowania zeruje jazde w nastepnym ticku. Zwraca numer zatrzasku."""
+        self.estop_id += 1
+        self.estop_latched = True
+        return self.estop_id
+
+    def estop_release(self, estop_id):
+        """ODBLOKUJ z /stop. False = numer nieaktualny (w miedzyczasie ktos wcisnal STOP)."""
+        if not self.estop_latched:
+            return True
+        if estop_id != self.estop_id:
+            return False
+        self.estop_latched = False
+        return True
+
+    def hard_stop(self):
+        """Zero jazdy bez rampy, koniec trybow auto, sekwencji i nagrywania; klawisze trzeba wcisnac od nowa."""
+        if self.mode == "sequence":
+            self.stop_sequence()
+        self.mode = "manual"
+        self.playback_name = None
+        self.recording = False
+        self.record_buffer = []
+        self.keys = {"w": False, "a": False, "s": False, "d": False}
+        self.speed = 0.0
+        self.steer = 0.0
+
     def _set_seq_target(self, speed, steer):
         self.seq_speed = speed
         self.seq_steer = steer
 
     def start_sequence(self, name, steps):
         """True = ruszyla. Zeruje klawisze i przelacza tryb; jedna sekwencja naraz."""
+        if self.estop_latched:
+            # nie startuj wcale: pierwszy krok ramienia poszedlby, zanim petla zdazy przerwac
+            self.seq_error = "E-STOP z telefonu - odblokuj na /stop"
+            return False
         if self.runner.status()["running"]:
             self.seq_error = "inna sekwencja jeszcze trwa"
             return False
@@ -256,11 +298,88 @@ class RobotState:
 state = RobotState()
 
 
+def estop_status():
+    return {
+        "latched": state.estop_latched,
+        "id": state.estop_id,
+        "mode": state.mode,
+        "speed": round(state.speed, 2),
+        "steer": round(state.steer, 2),
+        "failsafe": state.failsafe,
+        "connected": state.ser is not None,
+    }
+
+
 class FrontendHandler(http.server.SimpleHTTPRequestHandler):
     def translate_path(self, path):
         if path == "/":
             path = "/frontend.html"
+        elif path == "/stop":
+            path = "/stop.html"
         return super().translate_path(path)
+
+    def log_message(self, fmt, *args):
+        if self.path.startswith("/api/estop"):
+            return  # /stop odpytuje stan co 0.5 s - bez tego log zarasta
+        super().log_message(fmt, *args)
+
+    def _json(self, code, payload):
+        body = json.dumps(payload).encode("ascii")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        if self.path == "/api/estop":
+            self._json(200, estop_status())
+        else:
+            super().do_GET()
+
+    def do_POST(self):
+        # body zawsze przeczytac przed odpowiedzia: zamkniecie gniazda z nieprzeczytanymi danymi = RST u klienta
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = 0
+        raw = self.rfile.read(length) if 0 < length <= 1024 else b""
+        if self.path not in ("/api/estop", "/api/estop_release"):
+            self._json(404, {"ok": False, "msg": "nie ma"})
+            return
+        # Tylko z naszej strony: application/json wymusza preflight CORS (na OPTIONS nie odpowiadamy),
+        # wiec obca strona w tej sieci nie zdejmie zatrzasku.
+        origin = self.headers.get("Origin")
+        if origin and not (origin.startswith("http://") and origin.endswith(f":{HTTP_PORT}")):
+            self._json(403, {"ok": False, "msg": "obcy origin"})
+            return
+        if not (self.headers.get("Content-Type") or "").startswith("application/json"):
+            self._json(415, {"ok": False, "msg": "wymagany application/json"})
+            return
+        try:
+            data = json.loads(raw) if raw else {}
+        except ValueError:
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+
+        if self.path == "/api/estop":
+            estop_id = state.estop()
+            print(f"E-STOP #{estop_id} z {self.client_address[0]}")
+            threading.Thread(target=arm_stop, daemon=True).start()  # HTTP do ramienia do 2 s - nie blokuj odpowiedzi
+            self._json(200, {"ok": True, **estop_status()})
+        else:
+            try:
+                estop_id = int(data.get("id"))
+            except (TypeError, ValueError):
+                self._json(400, {"ok": False, "msg": "brak numeru STOP"})
+                return
+            if state.estop_release(estop_id):
+                print(f"E-STOP #{estop_id} odblokowany z {self.client_address[0]}")
+                self._json(200, {"ok": True, **estop_status()})
+            else:
+                self._json(409, {"ok": False, "msg": "w miedzyczasie nowszy STOP", **estop_status()})
 
 
 def start_http_server():
@@ -403,17 +522,10 @@ async def control_loop():
             print("Failsafe: no operator heartbeat, stopping." if operator_lost else "Operator heartbeat back.")
             state.failsafe = operator_lost
 
-        if operator_lost:
-            # Hard stop (no ramp) and drop any auto mode: nobody is watching the robot.
-            if state.mode == "sequence":
-                state.stop_sequence()
-            state.mode = "manual"
-            state.playback_name = None
-            state.recording = False
-            state.record_buffer = []
-            state.keys = {"w": False, "a": False, "s": False, "d": False}
-            state.speed = 0.0
-            state.steer = 0.0
+        if operator_lost or state.estop_latched:
+            # Hard stop (no ramp) and drop any auto mode: nobody is watching the robot,
+            # or the phone e-stop is latched (then every tick, so keys/modes stay ignored).
+            state.hard_stop()
         elif state.mode == "figure8":
             if time() - state.fig8_half_start >= p["fig8_loop_seconds"]:
                 state.fig8_direction *= -1
@@ -508,6 +620,7 @@ async def control_loop():
                 },
                 "playback_name": state.playback_name,
                 "failsafe": state.failsafe,
+                "estop": state.estop_latched,
                 "sequence": state.runner.status(),
                 "sequences": state.sequences,
                 "seq_error": state.seq_error,

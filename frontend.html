@@ -210,6 +210,7 @@
     <button class="stop-btn" id="stop-btn">STOP</button>
   </div>
   <div class="mode-text" id="mode-text"></div>
+  <div class="hint">wyłącznik na telefon: <a href="/stop" style="color: var(--accent)">/stop</a> (jeden duży STOP, blokuje jazdę do odblokowania)</div>
 
   <div class="panel">
     <div class="panel-title">NAGRYWANIE RUCHÓW</div>
@@ -337,6 +338,7 @@ function connect() {
     else if (mode === 'sequence') modeText.textContent = `tryb: SEKWENCJA ${data.sequence.name} — krok ${data.sequence.index + 1}/${data.sequence.total}: ${data.sequence.step || ''}`;
     else modeText.textContent = 'tryb: manualny';
     if (data.failsafe) modeText.textContent = 'STOP: brak sygnału od operatora';
+    if (data.estop) modeText.textContent = 'E-STOP z telefonu: jazda zablokowana, odblokuj na stronie /stop';
     renderSequence(data.sequence || {}, data.sequences || {}, data.seq_error);
 
     recordBtn.classList.toggle('active', data.recording);

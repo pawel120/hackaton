@@ -15,6 +15,9 @@ zadania i przypisania na tablicy Projects (link nizej). Czego nie ma tutaj albo 
 - Nowy stos `pinecone_bot` (PR #14 + poprawki PR #16): symulacja na laptopie zbiera 5/5 szyszek, 66 testow zielonych.
   Ramie odtwarza nagrane punkty, baza ustawia szyszke z obrazu, maszyna stanow, szukanie pasami. Bez IK, bez ML.
 - Detektor HSV dostrojony na prawdziwych szyszkach na sztucznej trawie (lo [130,35,30], hi [179,100,125], min_area 120): 3/3 szyszki, 0 falszywych na trawie.
+- Wylacznik na telefon: `http://<ip-pi>:8000/stop` (`stop.html`, serwuje `web_control.py`). Jeden duzy STOP: zatrzask, jazda zablokowana
+  (klawisze, tryby auto, sekwencje) do ODBLOKUJ na tej stronie, STOP idzie tez do ramienia. Zwykly HTTP, nie heartbeat: telefon na /stop
+  nie trzyma robota przy zyciu. Pokazuje lacze (ms) i czy robot jedzie. Sprawdzone w przegladarce bez Xiao, 8 testow; NIE na Pi.
 - Panel webowy ramienia `tools/arm_web.py` (port 8010): jog kazdego stawu o 1/5/10, HOME, chwytak, ruchy z `motions/`, STOP.
   Jazda + ramie w jednym miejscu: sekcja ramienia w panelu jazdy (:8000, `frontend.html`), glowny STOP zatrzymuje tez ramie.
   Dwa procesy na Pi: `web_control.py` i `tools/arm_web.py` (UI ramienia wspolne: `arm_panel.js`).
@@ -47,6 +50,8 @@ zadania i przypisania na tablicy Projects (link nizej). Czego nie ma tutaj albo 
   `python tools/bip_probe.py --port /dev/ttyAMA0` (nie rusza silnikow, sprawdza ASCII i protokol binarny na 3 baudach).
 - Pi nie ma internetu (WiFi nie dziala), kod wchodzi przez `deploy/push_to_pi.sh` / scp.
 - Zasilanie z akumulatora 12 V: issue #8, nie zaczete.
+- Wylacznik /stop nie wdrozony na Pi (trzeba restartu `web_control.py`). Przy lagu hotspotu > 1-2 s STOP z telefonu tez dojdzie pozno:
+  fizyczny wylacznik dalej w rece. Zatrzask nie blokuje panelu ramienia (:8010) - STOP ramienia idzie raz.
 - Sciezka S w `web_control.py` (POKRYCIE): nawroty naprzemienne (L, P, L...) poprawione w kodzie, NIE jechane na sprzecie.
   Do nastrojenia na trawie: `cov_turn_seconds` (90 st), `cov_forward_seconds`, `cov_lane_seconds`.
 
