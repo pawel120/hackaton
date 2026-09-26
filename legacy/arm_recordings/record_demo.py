@@ -1,7 +1,7 @@
 """Nagrywa pozycje przegubow, gdy CZLOWIEK recznie porusza ramieniem (torque off).
 
-Uzycie:
-    python record_demo.py --seconds 25 --out demo.csv
+Uzycie (uruchamiac z katalogu glownego repo):
+    python legacy/arm_recordings/record_demo.py --seconds 25 --out demo.csv
 
 Kolejnosc:
   1. Ramie jedzie do HOME_POSE (z torque, normalnie).
@@ -15,6 +15,8 @@ from __future__ import annotations
 import argparse
 import csv
 import time
+
+import os, sys; sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 import arm_control as ac
 

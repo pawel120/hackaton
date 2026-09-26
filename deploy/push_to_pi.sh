@@ -11,8 +11,9 @@
 # scp -r otherwise (plain copy, no delete).
 #
 # Config via env vars:
-#     PI_HOST   ssh target, default "pi@raspberrypi.local"
-#     PI_DIR    remote repo dir, default "~/hackaton"
+#     PI_HOST          ssh target, default "pi@raspberrypi.local"
+#     PI_DIR           remote repo dir, default "~/hackaton"
+#     PUSH_ANY_BRANCH  set to 1 to skip the non-master branch warning below
 #
 # Examples:
 #     PI_HOST=robot@192.168.1.42 bash deploy/push_to_pi.sh
@@ -26,6 +27,12 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PI_HOST="${PI_HOST:-pi@raspberrypi.local}"
 PI_DIR="${PI_DIR:-~/hackaton}"
+
+CURRENT_BRANCH="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
+if [[ "$CURRENT_BRANCH" != "master" && "${PUSH_ANY_BRANCH:-0}" != "1" ]]; then
+  echo "UWAGA: wysylasz branch '$CURRENT_BRANCH', a na Pi powinien byc master. Ctrl+C aby przerwac (5 s)..."
+  sleep 5
+fi
 
 step() { printf '\n==> %s\n' "$*"; }
 

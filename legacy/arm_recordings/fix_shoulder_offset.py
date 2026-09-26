@@ -12,6 +12,11 @@ id2: offset -701 - 1418 = -2119 == 1977 (mod 4096, offset ma max +-2047).
 id3 (elbow_flex) wraca do swoich rejestrow sprzed sesji: 1159, 1168..3423.
 
 Robi tez demo2_fixed.csv - demo2.csv przeliczone do nowej kalibracji.
+
+Jednorazowe, juz wykonane (2026-09-25) - zostawione do wgladu. Oba pliki CSV
+czyta i pisze obok siebie w legacy/arm_recordings/, niezaleznie od katalogu
+uruchomienia:
+    python legacy/arm_recordings/fix_shoulder_offset.py
 """
 
 from __future__ import annotations
@@ -22,6 +27,10 @@ from pathlib import Path
 
 from lerobot.motors import Motor, MotorNormMode
 from lerobot.motors.feetech import FeetechMotorsBus
+
+HERE = Path(__file__).resolve().parent
+DEMO2_CSV = HERE / "demo2.csv"
+DEMO2_FIXED_CSV = HERE / "demo2_fixed.csv"
 
 CALIB_PATH = Path.home() / ".cache/huggingface/lerobot/calibration/robots/so_follower/so101.json"
 DEG_PER_TICK = 360 / 4095
@@ -72,17 +81,17 @@ def main() -> None:
     CALIB_PATH.write_text(json.dumps(calib, indent=4))
     print("Zapisano", CALIB_PATH)
 
-    with open("demo2.csv") as f:
+    with open(DEMO2_CSV) as f:
         rows = list(csv.DictReader(f))
     for r in rows:
         r["shoulder_lift"] = shoulder_old_to_new(float(r["shoulder_lift"]))
         r["elbow_flex"] = elbow_old_to_new(float(r["elbow_flex"]))
-    with open("demo2_fixed.csv", "w", newline="") as f:
+    with open(DEMO2_FIXED_CSV, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0]))
         w.writeheader()
         w.writerows(rows)
     for k in ("shoulder_lift", "elbow_flex"):
-        print("demo2_fixed.csv", k, round(min(r[k] for r in rows), 1), "..", round(max(r[k] for r in rows), 1))
+        print(DEMO2_FIXED_CSV.name, k, round(min(r[k] for r in rows), 1), "..", round(max(r[k] for r in rows), 1))
 
 
 if __name__ == "__main__":

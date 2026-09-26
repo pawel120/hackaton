@@ -96,7 +96,7 @@ class ArmConfig:
     port: str = "/dev/robot-arm"
     arm_id: str = "so101"
     motions_dir: str = "motions"
-    subprocess_cmd: str = "python replay_demo.py --port {port}"
+    subprocess_cmd: str = "python legacy/arm_recordings/replay_demo.py --port {port}"
     empty_gripper_below: float = 6.0  # odczyt gripper.pos po zamknieciu ponizej tego = pusty chwytak
 
 

@@ -1,7 +1,7 @@
 """
 Test planu dojazdu z drive_to_target.py - bez sprzetu, bez portu, bez pytest.
 
-    python test_drive_plan.py
+    python legacy/ik_approach/test_drive_plan.py
 
 Sprawdzane jest to, co w open-loop boli najbardziej i czego na sprzecie nie
 wychwycisz bez rozbijania platformy:

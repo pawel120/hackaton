@@ -347,10 +347,10 @@ def test_subprocess_arm_formats_command():
 
     cfg = make_cfg("subprocess")
     cfg.arm.port = "/dev/robot-arm"
-    cfg.arm.subprocess_cmd = "python replay_demo.py --port {port} --motion {name}"
+    cfg.arm.subprocess_cmd = "python legacy/arm_recordings/replay_demo.py --port {port} --motion {name}"
     sub = SubprocessArm(cfg, run=fake_run)
     assert sub.replay("grasp_mid") is None
-    assert calls[0][0] == "python replay_demo.py --port /dev/robot-arm --motion grasp_mid"
+    assert calls[0][0] == "python legacy/arm_recordings/replay_demo.py --port /dev/robot-arm --motion grasp_mid"
     assert calls[0][1]["shell"] is True
 
 

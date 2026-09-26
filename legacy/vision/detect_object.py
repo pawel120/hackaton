@@ -11,10 +11,10 @@ Uklad wspolrzednych (optyczny RealSense, metry):
     wyrownana (`rs.align`), wiec piksel koloru i piksel glebi to ten sam promien.
 
 Uzycie:
-    python detect_object.py --color red                 # podglad + XYZ na zywo
-    python detect_object.py --color blue --log out.csv  # do tego zapis CSV
-    python detect_object.py --tune                      # suwaki HSV, dobranie progu
-    python detect_object.py --color green --no-preview  # bez okna, sam log
+    python legacy/vision/detect_object.py --color red                 # podglad + XYZ na zywo
+    python legacy/vision/detect_object.py --color blue --log out.csv  # do tego zapis CSV
+    python legacy/vision/detect_object.py --tune                      # suwaki HSV, dobranie progu
+    python legacy/vision/detect_object.py --color green --no-preview  # bez okna, sam log
 
 Klawisze w podgladzie:
     q / ESC   wyjscie

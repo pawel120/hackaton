@@ -2,7 +2,7 @@
 Test planu chwytu BEZ SPRZETU: bez ramienia, bez portu, bez kamery.
 
 Uruchomienie (zwykly python, bez pytest):
-    python test_grasp_plan.py
+    python legacy/ik_approach/test_grasp_plan.py
 
 Sprawdzamy to, co naprawde moze zniszczyc chwyt albo ramie:
   * sekwencja ma sensowne kroki w sensownej kolejnosci i trafia w cel,
