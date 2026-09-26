@@ -70,3 +70,31 @@ def test_save_joint_touches_one_entry_and_backs_up(tmp_path):
     assert new["shoulder_lift"] == {"id": 2, "drive_mode": 0, "homing_offset": 100, "range_min": 1000, "range_max": 3000}
     assert new["elbow_flex"] == calib["elbow_flex"]
     assert json.loads(open(backup).read()) == calib
+
+
+def test_propose_many_skips_joint_that_did_not_move():
+    samples = {"shoulder_lift": list(range(1006, 3090, 5)), "gripper": [2000, 2005, 2010]}
+    proposals, errors = cj.propose_many(samples, {"shoulder_lift": 1977, "gripper": 0})
+    assert set(proposals) == {"shoulder_lift"}
+    assert set(errors) == {"gripper"}
+
+
+def test_save_joints_writes_many_with_one_backup(tmp_path):
+    path = tmp_path / "so101.json"
+    calib = {
+        "shoulder_lift": {"id": 2, "drive_mode": 0, "homing_offset": 1977, "range_min": 1006, "range_max": 3089},
+        "elbow_flex": {"id": 3, "drive_mode": 0, "homing_offset": 1159, "range_min": 1168, "range_max": 3423},
+        "gripper": {"id": 6, "drive_mode": 0, "homing_offset": 0, "range_min": 2000, "range_max": 3000},
+    }
+    path.write_text(json.dumps(calib))
+    news = {
+        "shoulder_lift": {"homing_offset": 100, "range_min": 1000, "range_max": 3000, "span": 2000},
+        "elbow_flex": {"homing_offset": -50, "range_min": 1100, "range_max": 2900, "span": 1800},
+    }
+    backup = cj.save_joints(str(path), news)
+    new = json.loads(path.read_text())
+    assert new["shoulder_lift"]["homing_offset"] == 100
+    assert new["elbow_flex"] == {"id": 3, "drive_mode": 0, "homing_offset": -50, "range_min": 1100, "range_max": 2900}
+    assert new["gripper"] == calib["gripper"]
+    assert json.loads(open(backup).read()) == calib
+    assert len(list(tmp_path.glob("so101.json.bak-*"))) == 1

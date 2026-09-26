@@ -1,4 +1,4 @@
-"""Kalibracja JEDNEGO stawu ramienia SO-101 (domyslnie shoulder_lift), bez `lerobot calibrate`.
+"""Kalibracja stawu ramienia SO-101 (domyslnie shoulder_lift; --joint all = wszystkie), bez `lerobot calibrate`.
 
 `lerobot calibrate` nadpisuje wszystkie stawy (w tym reczne poprawki barku, docs/HARDWARE.md
 pulapki 1 i 3). To narzedzie rusza tylko wybrany staw: Homing_Offset + limity pozycji w EEPROM
@@ -9,8 +9,12 @@ Uzycie (na Pi, z katalogu repo; nic innego nie moze trzymac portu - zatrzymaj to
     python tools/calibrate_joint.py --record 20        # torque OFF na stawie, 20 s: przeprowadz staw
                                                        # recznie przez CALY zakres; wypisuje propozycje
     python tools/calibrate_joint.py --record 20 --write   # j.w. + zapis (pyta o potwierdzenie "TAK")
+    python tools/calibrate_joint.py --joint all --record 30 --write
+                                                       # wszystkie 6 stawow naraz, jedno "TAK"
 
 UWAGA: --record zdejmuje torque ze stawu - ramie opadnie w tym stawie. Trzymaj je.
+Przy --joint all torque schodzi ze WSZYSTKICH stawow: cale ramie jest wiotkie.
+Staw, ktory prawie sie nie ruszal (albo zrobil pelny obrot), jest pomijany i nie jest zapisywany.
 
 Model Feetech STS3215 (tak liczy lerobot): Present = Actual - Homing_Offset (mod 4096).
 Nowy offset ustawia srodek nagranego zakresu na 2047, wiec zakres jest daleko od zera enkodera
@@ -97,22 +101,41 @@ def load_calib(path: str) -> dict:
         return json.load(fh)
 
 
-def save_joint(path: str, joint: str, new: dict) -> str:
-    """Zapisuje wpis jednego stawu (reszta pliku bez zmian). Zwraca sciezke kopii zapasowej."""
+def propose_many(samples: dict, offsets: dict) -> tuple:
+    """propose() dla kilku stawow. Zwraca (propozycje, bledy); staw z bledem nie ma propozycji."""
+    proposals: dict = {}
+    errors: dict = {}
+    for joint, present_samples in samples.items():
+        try:
+            proposals[joint] = propose(present_samples, offsets[joint])
+        except ValueError as exc:
+            errors[joint] = str(exc)
+    return proposals, errors
+
+
+def save_joints(path: str, news: dict) -> str:
+    """Zapisuje wpisy podanych stawow (reszta pliku bez zmian), jedna kopia zapasowa. Zwraca jej sciezke."""
     calib = load_calib(path)
     backup = f"{path}.bak-{time.strftime('%Y%m%d-%H%M%S')}"
     shutil.copy2(path, backup)
-    entry = dict(calib[joint])
-    entry.update({k: new[k] for k in ("homing_offset", "range_min", "range_max")})
-    calib[joint] = entry
+    for joint, new in news.items():
+        entry = dict(calib[joint])
+        entry.update({k: new[k] for k in ("homing_offset", "range_min", "range_max")})
+        calib[joint] = entry
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(calib, fh, indent=4)
     return backup
 
 
+def save_joint(path: str, joint: str, new: dict) -> str:
+    """Zapisuje wpis jednego stawu (reszta pliku bez zmian). Zwraca sciezke kopii zapasowej."""
+    return save_joints(path, {joint: new})
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--joint", default="shoulder_lift", choices=list(MOTOR_IDS))
+    parser.add_argument("--joint", default="shoulder_lift", choices=list(MOTOR_IDS) + ["all"],
+                        help="staw albo 'all' (wszystkie naraz)")
     parser.add_argument("--port", default=os.environ.get("ROBOT_ARM_PORT", "/dev/robot-arm"))
     parser.add_argument("--calib", default=CALIB_PATH)
     parser.add_argument("--record", type=float, default=0.0, metavar="S",
@@ -125,62 +148,86 @@ def main() -> int:
     from lerobot.motors import Motor, MotorNormMode  # lazy: lerobot tylko na Pi
     from lerobot.motors.feetech import FeetechMotorsBus
 
-    joint = args.joint
-    file_cal = load_calib(args.calib)[joint]
-    bus = FeetechMotorsBus(args.port, {joint: Motor(MOTOR_IDS[joint], "sts3215", MotorNormMode.DEGREES)})
+    joints = list(MOTOR_IDS) if args.joint == "all" else [args.joint]
+    calib = load_calib(args.calib)
+    bus = FeetechMotorsBus(args.port, {j: Motor(MOTOR_IDS[j], "sts3215", MotorNormMode.DEGREES) for j in joints})
     bus.connect()
     try:
-        def reg(name: str) -> int:
+        def reg(name: str, joint: str) -> int:
             return int(bus.read(name, joint, normalize=False))
 
-        offset = reg("Homing_Offset")
-        present = reg("Present_Position")
-        lim = (reg("Min_Position_Limit"), reg("Max_Position_Limit"))
-        print(f"{joint} (id {MOTOR_IDS[joint]})")
-        print(f"  serwo: Homing_Offset {offset}, limity {lim[0]}..{lim[1]}, Present {present}")
-        print(f"  plik:  homing_offset {file_cal['homing_offset']}, zakres {file_cal['range_min']}..{file_cal['range_max']}"
-              f" (+-{deg_half_range(file_cal):.1f} st)")
-        print(f"  kat wg pliku: {present_to_deg(present, file_cal):.1f} st")
-        if offset != file_cal["homing_offset"] or lim != (file_cal["range_min"], file_cal["range_max"]):
-            print("  !! rejestry serwa NIE zgadzaja sie z plikiem - lerobot liczy katy z pliku")
+        offsets = {}
+        for joint in joints:
+            file_cal = calib[joint]
+            offset = reg("Homing_Offset", joint)
+            present = reg("Present_Position", joint)
+            lim = (reg("Min_Position_Limit", joint), reg("Max_Position_Limit", joint))
+            offsets[joint] = offset
+            print(f"{joint} (id {MOTOR_IDS[joint]})")
+            print(f"  serwo: Homing_Offset {offset}, limity {lim[0]}..{lim[1]}, Present {present}")
+            print(f"  plik:  homing_offset {file_cal['homing_offset']}, zakres {file_cal['range_min']}..{file_cal['range_max']}"
+                  f" (+-{deg_half_range(file_cal):.1f} st)")
+            print(f"  kat wg pliku: {present_to_deg(present, file_cal):.1f} st")
+            if offset != file_cal["homing_offset"] or lim != (file_cal["range_min"], file_cal["range_max"]):
+                print("  !! rejestry serwa NIE zgadzaja sie z plikiem - lerobot liczy katy z pliku")
         if args.record <= 0:
             return 0
 
-        print(f"\nTORQUE OFF na {joint} - TRZYMAJ RAMIE. Przez {args.record:.0f} s przeprowadz staw"
-              " powoli przez CALY zakres (oba konce).")
-        bus.disable_torque([joint])
-        samples = []
+        print(f"\nTORQUE OFF na: {', '.join(joints)} - TRZYMAJ RAMIE. Przez {args.record:.0f} s przeprowadz"
+              " powoli kazdy staw przez CALY zakres (oba konce).")
+        bus.disable_torque(joints)
+        samples: dict = {j: [] for j in joints}
         t_end = time.monotonic() + args.record
+        next_note = time.monotonic() + 5.0
         while time.monotonic() < t_end:
-            try:
-                samples.append(reg("Present_Position"))
-            except Exception as exc:  # noqa: BLE001 - pojedynczy zgubiony pakiet nie przerywa nagrania
-                print(f"  (pominieto odczyt: {exc})")
+            for joint in joints:
+                try:
+                    samples[joint].append(reg("Present_Position", joint))
+                except Exception as exc:  # noqa: BLE001 - pojedynczy zgubiony pakiet nie przerywa nagrania
+                    print(f"  (pominieto odczyt {joint}: {exc})")
+            if time.monotonic() >= next_note:
+                print(f"  zostalo {max(0.0, t_end - time.monotonic()):.0f} s")
+                next_note += 5.0
             time.sleep(0.05)
-        new = propose(samples, offset)
-        new_cal = {**file_cal, **new}
-        print(f"\nnagrano {len(samples)} probek, zakres {new['span']} krokow (+-{deg_half_range(new_cal):.1f} st)")
-        print(f"  PROPOZYCJA: Homing_Offset {new['homing_offset']}, limity {new['range_min']}..{new['range_max']}")
-        now_present = samples[-1] + offset - new["homing_offset"]
-        print(f"  staw teraz bylby na {present_to_deg(now_present, new_cal):.1f} st")
+
+        proposals, errors = propose_many(samples, offsets)
+        print()
+        for joint in joints:
+            if joint in errors:
+                print(f"{joint}: POMINIETY - {errors[joint]}")
+                continue
+            new = proposals[joint]
+            new_cal = {**calib[joint], **new}
+            now_present = samples[joint][-1] + offsets[joint] - new["homing_offset"]
+            print(f"{joint}: nagrano {len(samples[joint])} probek, zakres {new['span']} krokow"
+                  f" (+-{deg_half_range(new_cal):.1f} st)")
+            print(f"  PROPOZYCJA: Homing_Offset {new['homing_offset']}, limity {new['range_min']}..{new['range_max']},"
+                  f" staw teraz bylby na {present_to_deg(now_present, new_cal):.1f} st")
+        if not proposals:
+            print("  nic do zapisania")
+            return 1
         if not args.write:
             print("  (bez --write nic nie zapisano)")
             return 0
-        if input("Zapisac do EEPROM serwa i do pliku kalibracji? wpisz TAK: ").strip() != "TAK":
+        if input(f"Zapisac {', '.join(proposals)} do EEPROM serw i do pliku kalibracji? wpisz TAK: ").strip() != "TAK":
             print("  nie zapisano")
             return 0
-        bus.write("Homing_Offset", joint, new["homing_offset"], normalize=False)
-        bus.write("Min_Position_Limit", joint, new["range_min"], normalize=False)
-        bus.write("Max_Position_Limit", joint, new["range_max"], normalize=False)
-        back = (reg("Homing_Offset"), reg("Min_Position_Limit"), reg("Max_Position_Limit"))
-        print(f"  serwo po zapisie: offset {back[0]}, limity {back[1]}..{back[2]}")
-        if back != (new["homing_offset"], new["range_min"], new["range_max"]):
-            print("  !! odczyt po zapisie inny niz zapisany - plik NIE zmieniony")
-            return 1
-        backup = save_joint(args.calib, joint, new)
-        print(f"  plik zapisany: {args.calib} (kopia: {backup})")
-        print("  Po zmianie kalibracji spisz na nowo HOME_POSE i sprawdz motions/ (pulapka 12).")
-        return 0
+        written: dict = {}
+        for joint, new in proposals.items():
+            bus.write("Homing_Offset", joint, new["homing_offset"], normalize=False)
+            bus.write("Min_Position_Limit", joint, new["range_min"], normalize=False)
+            bus.write("Max_Position_Limit", joint, new["range_max"], normalize=False)
+            back = (reg("Homing_Offset", joint), reg("Min_Position_Limit", joint), reg("Max_Position_Limit", joint))
+            print(f"  {joint} po zapisie: offset {back[0]}, limity {back[1]}..{back[2]}")
+            if back != (new["homing_offset"], new["range_min"], new["range_max"]):
+                print(f"  !! {joint}: odczyt po zapisie inny niz zapisany - jego wpis w pliku NIE zmieniony")
+                continue
+            written[joint] = new
+        if written:
+            backup = save_joints(args.calib, written)
+            print(f"  plik zapisany ({', '.join(written)}): {args.calib} (kopia: {backup})")
+            print("  Po zmianie kalibracji spisz na nowo HOME_POSE i sprawdz motions/ (pulapka 12).")
+        return 0 if len(written) == len(proposals) else 1
     finally:
         bus.disconnect(disable_torque=True)
 
