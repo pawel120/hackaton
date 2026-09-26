@@ -19,7 +19,13 @@ zadania i przypisania na tablicy Projects (link nizej). Czego nie ma tutaj albo 
   Jazda + ramie w jednym miejscu: sekcja ramienia w panelu jazdy (:8000, `frontend.html`), glowny STOP zatrzymuje tez ramie.
   Dwa procesy na Pi: `web_control.py` i `tools/arm_web.py` (UI ramienia wspolne: `arm_panel.js`).
   Logika w `pinecone_bot/arm_panel.py` (kolejka, zakres z kalibracji, limit kroku), 22 testy; sprawdzony w przegladarce na atrapie (`--fake`).
-  `--no-home`: bez HOME przy starcie, HOME i `motions/` wylaczone, tylko jog i chwytak (kamera siedzi teraz na ramieniu - HOME w nia uderzy).
+  `--no-home`: bez HOME przy starcie (kamera siedzi teraz na ramieniu - HOME w nia uderzy); jog, chwytak i ruchy z `motions/` dzialaja,
+  po pustym chwycie ramie zostaje w miejscu zamiast wracac do HOME.
+- Zbieranie szyszek "na sztywno" z panelu (:8000), bez kodu: (1) sekcja ramienia "NAGRYWANIE RUCHU": ustaw stawami, "+ PUNKT" (chwytak z ostatniej
+  komendy, wiec przed punktem zacisku "Zamknij chwytak"), "ZAPISZ do motions/" -> `motions/<nazwa>.json`; (2) sekcja "SEKWENCJA": kroki jazda
+  (speed/steer/sekundy, bez limitu z suwaka) / ramie (ruch z motions/) / czekaj, "TEST TEGO KROKU", szkic w przegladarce, zapis do `sequences/<nazwa>.json`,
+  odtwarzanie w trybie "sequence" (`pinecone_bot/sequence.py`, 12 testow; STOP/failsafe/zmiana trybu przerywa i zeruje jazde + STOP ramienia).
+  Sprawdzone w przegladarce na atrapie ramienia (`--fake`) i bez Xiao; NIE na sprzecie.
 - `motions/grasp_mid.json`: chwyt z `demo2_fixed.csv` (aktualna kalibracja). `home.json`, `drop_box.json` (placeholder).
 
 ## Nie dziala / nie sprawdzone
@@ -28,7 +34,8 @@ zadania i przypisania na tablicy Projects (link nizej). Czego nie ma tutaj albo 
 - HSV sprawdzone w jednym swietle; auto white balance kamery przez ~1 s po starcie daje zielona trawe i 0 detekcji (zablokowac AWB/ekspozycje w camera.py).
 - `lsusb` zglasza kamere jako D435 (8086:0b07), docs mowia D415 - sprawdzic model.
 - Kamera stoi za nisko: miejsce chwytu (17 cm przed kamera) jest w martwej strefie glebi (~31 cm). Trzeba przestawic.
-- Panel ramienia (`tools/arm_web.py --no-home`) chodzi na Pi, jog NIE sprawdzony na ramieniu.
+- Panel ramienia (`tools/arm_web.py --no-home`) chodzi na Pi, jog NIE sprawdzony na ramieniu. Nagrywanie ruchu z panelu i sekwencje
+  (jazda + ramie) tylko na atrapie; na Pi trzeba zrestartowac oba serwery (`web_control.py` woli `http://127.0.0.1:8010`, env `ROBOT_ARM_PANEL`).
 - `shoulder_lift` stoi poza zakresem kalibracji (odczyt 127.7 st, zakres +-91.6; kamera na ramieniu). Panel blokuje jog tego stawu - trzeba go ustawic recznie albo sprawdzic kalibracje pod nowy montaz (NIE `lerobot calibrate`).
 - Hotspot: ping do Pi skacze do 240 ms i gubi pakiety, heartbeat panelu jazdy (1 s) co chwile wpada w failsafe (robot staje na chwile).
 - Chwyty `grasp_near`, `grasp_far`, `drop_box` nie nagrane (config ma na razie tylko `grasp_mid`).
@@ -42,7 +49,9 @@ zadania i przypisania na tablicy Projects (link nizej). Czego nie ma tutaj albo 
 
 1. Kamera na maszt: wysokosc i kat z `tools/camera_geometry.py` (np. 0.45 m, 38 st, 10 cm za osia kol);
    potem `tools/snap_frames.py` + `tools/calibrate_hsv.py` na prawdziwej trawie.
-2. Na Pi: `python tools/arm_web.py` (panel ramienia, :8010), sprawdzic jog/HOME/STOP. Potem nagrac `grasp_near`, `grasp_far`, `drop_box` (`tools/record_waypoints.py`; panel pomaga ustawic poze), skalibrowac `target_row` (`tools/calibrate_target.py`).
+2. Na Pi: `python tools/arm_web.py --no-home` (:8010) + `python web_control.py` (:8000), sprawdzic jog/STOP. Potem nagrac chwyt pod kamere na ramieniu
+   z panelu ("NAGRYWANIE RUCHU" -> `motions/grasp_cam.json`) i ulozyc sekwencje zbierania (jazda -> chwyt -> cofniecie) w sekcji "SEKWENCJA";
+   alternatywnie `tools/record_waypoints.py`. Potem `target_row` (`tools/calibrate_target.py`).
 3. `tools/base_test.py` (znak skretu, PWM), potem `python -m pinecone_bot.main --dry-run`, potem `--real` z wylacznikiem w rece.
 
 ## Blokery

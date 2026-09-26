@@ -7,6 +7,10 @@
 //     keyboardStop: false,  // spacja = STOP ramienia
 //   });
 //   arm.stop();             // np. z glownego przycisku STOP jazdy
+//   arm.motions();          // nazwy ruchow z motions/ (ostatni stan serwera)
+//
+// Sekcja "NAGRYWANIE RUCHU": biezaca poza -> punkt szkicu (add_point), szkic -> motions/<nazwa>.json
+// (save_motion). Szkic trzyma serwer (pinecone_bot/arm_panel.py), wiec przezywa odswiezenie strony.
 //
 // Style sa pod klasa .armp, zeby nie gryzly sie z frontend.html.
 // DOM budowany raz; przy odpytywaniu stanu zmieniany jest tylko tekst i pozycje
@@ -51,6 +55,16 @@
   .armp .armp-stopbar { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px;
                         background: linear-gradient(transparent, #0f1115 30%); display: flex; justify-content: center; z-index: 10; }
   .armp .armp-stopbar .armp-stop { max-width: 520px; font-size: 20px; padding: 18px; }
+  .armp .armp-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  .armp .armp-form input[type=text], .armp .armp-form input[type=number] {
+    font: inherit; color: var(--armp-text); background: var(--armp-btn); border: 1px solid var(--armp-border);
+    border-radius: 8px; padding: 8px; min-width: 0; }
+  .armp .armp-form input[type=text] { flex: 1 1 140px; }
+  .armp .armp-form input[type=number] { width: 72px; }
+  .armp .armp-chk { font-size: 12px; color: var(--armp-muted); display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .armp .armp-draft { font-size: 12px; margin: 6px 0 10px; font-variant-numeric: tabular-nums; }
+  .armp .armp-draft div { padding: 2px 0; border-bottom: 1px solid var(--armp-border); }
+  .armp .armp-warn { color: var(--armp-warn); font-size: 12px; margin-bottom: 8px; }
   `;
 
   const OFFLINE = "Serwer ramienia nie działa (na Pi: python tools/arm_web.py)";
@@ -91,7 +105,30 @@
       </div>
       <div class="armp-sec armp-mot">
         <div class="armp-title">RUCHY Z motions/</div>
+        <div class="armp-warn armp-mot-warn" style="display:none">tryb bez HOME: odtwarzaj tylko ruchy nagrane pod aktualny montaz (grasp_mid/home/drop_box koncza w HOME i uderza w kamere)</div>
         <div class="armp-row armp-motions"></div>
+      </div>
+      <div class="armp-sec armp-rec">
+        <div class="armp-title">NAGRYWANIE RUCHU <span class="armp-muted">(ustaw stawami, dodaj punkt, zapisz)</span></div>
+        <div class="armp-form">
+          <input type="text" class="armp-label" placeholder="etykieta punktu (np. nad szyszka)" maxlength="40" />
+          <input type="number" class="armp-secs" min="0" max="30" step="0.1" value="1.5" title="czas dojazdu do punktu [s]" />
+          <label class="armp-chk"><input type="checkbox" class="armp-check" /> zacisk (check_gripper)</label>
+        </div>
+        <div class="armp-row">
+          <button class="armp-add" data-always="1">+ PUNKT (biezaca poza)</button>
+          <button class="armp-drop" data-always="1">usun ostatni</button>
+        </div>
+        <div class="armp-draft armp-muted"></div>
+        <div class="armp-form">
+          <input type="text" class="armp-mname" placeholder="nazwa ruchu (np. grasp_cam)" maxlength="40" />
+          <label class="armp-chk"><input type="checkbox" class="armp-over" /> nadpisz istniejacy</label>
+        </div>
+        <div class="armp-row">
+          <button class="armp-save" data-always="1">ZAPISZ do motions/</button>
+          <button class="armp-clear" data-always="1">wyczysc szkic</button>
+        </div>
+        <div class="armp-muted">Chwytak zapisuje sie z ostatniej komendy: przed punktem "zacisk" kliknij "Zamknij chwytak". Sekundy = czas dojazdu do punktu.</div>
       </div>
       <div class="${opts.stickyStop ? "armp-stopbar" : "armp-sec"}">
         <button class="armp-stop" data-always="1">STOP RAMIENIA${opts.keyboardStop ? " (spacja)" : ""}</button>
@@ -101,11 +138,15 @@
     const el = {
       dot: q(".armp-dot"), st: q(".armp-st"), result: q(".armp-result"), error: q(".armp-error"),
       steps: q(".armp-steps"), joints: q(".armp-joints"), motions: q(".armp-motions"),
+      draft: q(".armp-draft"), label: q(".armp-label"), secs: q(".armp-secs"), check: q(".armp-check"),
+      mname: q(".armp-mname"), over: q(".armp-over"), motWarn: q(".armp-mot-warn"),
     };
     const marks = {};  // joint -> {v, p, s, lo, hi}
     let step = 5;
     let built = false;
     let motionsKey = "";
+    let draftKey = "";
+    let lastMotions = [];
     let sendError = "";
 
     function showError(msg) {
@@ -113,7 +154,7 @@
       el.error.textContent = msg;
     }
 
-    async function send(cmd) {
+    async function send(cmd, showMsg) {
       try {
         const r = await fetch(base + "/api/cmd", {
           method: "POST",
@@ -123,8 +164,11 @@
         const j = await r.json();
         if (!j.ok) showError("Odrzucone: " + j.msg);
         else if (sendError) showError("");
+        if (j.ok && showMsg) el.result.textContent = j.msg;
+        return j.ok;
       } catch (e) {
         showError(OFFLINE);
+        return false;
       }
     }
 
@@ -180,6 +224,16 @@
       if (!names.length) el.motions.innerHTML = '<span class="armp-muted">brak plików w motions/</span>';
     }
 
+    function buildDraft(draft) {
+      if (!draft.length) { el.draft.innerHTML = '<span class="armp-muted">szkic pusty</span>'; return; }
+      let total = 0;
+      el.draft.innerHTML = draft.map((wp, i) => {
+        total += wp.seconds;
+        const pose = Object.entries(wp.pose).map(([j, v]) => `${j.replace("shoulder_", "sh_").replace("wrist_", "wr_").replace("elbow_flex", "elbow")}=${v}`).join(" ");
+        return `<div>${i + 1}. <b>${wp.label}</b> ${wp.seconds}s${wp.check_gripper ? " [zacisk]" : ""} <span class="armp-muted">${pose}</span></div>`;
+      }).join("") + `<div>razem ${draft.length} pkt, ${total.toFixed(1)} s</div>`;
+    }
+
     function placeMark(m, v, lo, hi) {
       if (v === undefined || v === null) { m.style.display = "none"; return; }
       m.style.display = "";
@@ -206,15 +260,17 @@
         built = true;
       }
       const key = s.motions.join(",");
-      if (key !== motionsKey) { buildMotions(s.motions); motionsKey = key; }
+      if (key !== motionsKey) { buildMotions(s.motions); motionsKey = key; lastMotions = s.motions.slice(); }
+      const dkey = JSON.stringify(s.draft || []);
+      if (dkey !== draftKey) { buildDraft(s.draft || []); draftKey = dkey; }
 
       el.dot.className = "armp-dot " + (s.busy ? "busy" : "on");
       let st = s.busy ? busyText(s.busy) : "gotowe";
       if (s.queue) st += ` (w kolejce: ${s.queue})`;
       if (!s.homed) st = (s.busy ? "jadę do HOME..." : "czekam na HOME") + " - inne komendy zablokowane";
-      if (s.manual_only) st += " | tryb bez HOME: tylko stawy i chwytak";
-      // --no-home: HOME i ruchy z motions/ wylaczone na serwerze, chowamy je (chwytak zostaje)
-      q(".armp-mot").style.display = s.manual_only ? "none" : "";
+      if (s.manual_only) st += " | tryb bez HOME";
+      // --no-home: HOME wylaczone na serwerze, chowamy je; ruchy z motions/ zostaja z ostrzezeniem
+      el.motWarn.style.display = s.manual_only ? "" : "none";
       q('[data-cmd="home"]').style.display = s.manual_only ? "none" : "";
       el.st.textContent = st;
       el.result.textContent = s.result || "";
@@ -254,6 +310,21 @@
     root.querySelectorAll("[data-cmd]").forEach((b) => {
       b.onclick = () => send({ cmd: b.dataset.cmd });
     });
+    q(".armp-add").onclick = async () => {
+      const ok = await send({
+        cmd: "add_point", label: el.label.value.trim(), seconds: Number(el.secs.value),
+        check_gripper: el.check.checked,
+      }, true);
+      if (ok) { el.label.value = ""; el.check.checked = false; }
+    };
+    q(".armp-drop").onclick = () => send({ cmd: "drop_point" }, true);
+    q(".armp-clear").onclick = () => {
+      if (window.confirm("Wyczyscic szkic ruchu?")) send({ cmd: "clear_points" }, true);
+    };
+    q(".armp-save").onclick = async () => {
+      const ok = await send({ cmd: "save_motion", name: el.mname.value.trim(), overwrite: el.over.checked }, true);
+      if (ok) el.over.checked = false;
+    };
     const stop = () => send({ cmd: "stop" });
     q(".armp-stop").onclick = stop;
     if (opts.keyboardStop) {
@@ -264,7 +335,7 @@
       document.addEventListener("keyup", (e) => { if (e.code === "Space") e.preventDefault(); });
     }
     poll();
-    return { stop };
+    return { stop, motions: () => lastMotions };
   }
 
   window.mountArmPanel = mountArmPanel;
