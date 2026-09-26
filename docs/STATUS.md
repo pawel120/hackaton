@@ -47,6 +47,8 @@ zadania i przypisania na tablicy Projects (link nizej). Czego nie ma tutaj albo 
   `python tools/bip_probe.py --port /dev/ttyAMA0` (nie rusza silnikow, sprawdza ASCII i protokol binarny na 3 baudach).
 - Pi nie ma internetu (WiFi nie dziala), kod wchodzi przez `deploy/push_to_pi.sh` / scp.
 - Zasilanie z akumulatora 12 V: issue #8, nie zaczete.
+- Sciezka S w `web_control.py` (POKRYCIE): nawroty naprzemienne (L, P, L...) poprawione w kodzie, NIE jechane na sprzecie.
+  Do nastrojenia na trawie: `cov_turn_seconds` (90 st), `cov_forward_seconds`, `cov_lane_seconds`.
 
 ## Nastepne 3 kroki (w tej kolejnosci)
 

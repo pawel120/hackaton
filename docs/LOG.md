@@ -604,3 +604,13 @@ Panel jazdy i ramienia w jednym miejscu: UI ramienia w `arm_panel.js`, montowane
 **Nie dziala / otwarte:** ramie uszkodzone - ocena. `shoulder_lift` czyta 116-128 st przy zakresie +-91.6, a wedlug uzytkownika staw jest fizycznie w zakresie -> podejrzenie rozjazdu Homing_Offset w serwie vs so101.json. Narzedzie do kalibracji jednego stawu (tools/calibrate_joint.py) zablokowane przez uprawnienia sesji - czeka na decyzje uzytkownika. Jazda po hotspocie z opoznieniem > 1 s jest niebezpieczna niezaleznie od kodu: dead-man nie odroznia spoznionych komend.
 **Nastepny krok:** ogledziny ramienia; Pi na dobrym zasilaniu; zanim ktos pojedzie zdalnie - znaczniki czasu w komendach jazdy (odrzucac spoznione) albo jazda tylko w zasiegu wzroku z wylacznikiem.
 **Sprzet:** dotkniety (robot wjechal w ramie - uszkodzenie)
+## 2026-09-26 - tomek - sciezka S w POKRYCIU
+**Zrobione:** tryb POKRYCIE w `web_control.py` zawsze skrecal w te sama strone, wiec po drugim nawrocie
+wracal na pierwszy pas i jezdzil tam i z powrotem po dwoch pasach. Teraz kierunek nawrotu zmienia sie po
+kazdym `turn2` (L, P, L...), wiec pasy ida w poprzek pola. Logika fazy wydzielona do `coverage_advance()`,
+test `tests/test_web_control_coverage.py` (websockets podstawiony stubem, bo nie ma go w CI).
+**Nie dziala / otwarte:** nie jechane na sprzecie. Czasy otwarte (bez odometrii), wiec 90 st zalezy od
+`cov_turn_seconds`. Znak skretu Xiao niezmierzony: pierwszy nawrot moze pojsc w prawo - wtedy start z drugiego rogu.
+**Nastepny krok:** na trawie nastroic `cov_turn_seconds` do 90 st, potem dlugosc pasa i odstep; zmierzone
+predkosci przepisac do `search_drive_v` / `search_w` w `pinecone_config.json`.
+**Sprzet:** nie
