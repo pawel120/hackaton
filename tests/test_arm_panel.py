@@ -382,3 +382,11 @@ def test_jog_blocked_when_joint_outside_calibration_range():
     panel.process_one()
     assert panel.last_error is None
     assert all(set(a) == {"elbow_flex.pos"} for a in arm.actions)
+
+
+def test_default_speed_is_halved():
+    # 2026-09-26: po wjechaniu robota w ramie predkosc panelu zmniejszona o polowe
+    from pinecone_bot.arm_panel import DEFAULT_MAX_STEP
+
+    assert all(DEFAULT_MAX_STEP[j] == 1.0 for j in JOINT_NAMES if j != "gripper")
+    assert DEFAULT_MAX_STEP["gripper"] == 2.0
